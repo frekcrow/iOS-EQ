@@ -2,23 +2,46 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Unsandboxed execution for TrollStore and Jailbreak -->
-	<key>com.apple.private.security.no-sandbox</key>
-	<true/>
-	
-	<!-- Platform application rights -->
+	<!-- TrollStore Unsandboxed & Platform Privileges -->
 	<key>platform-application</key>
 	<true/>
 	
-	<!-- Allow writing to /var/mobile/Library/Preferences and system storage -->
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	
+	<key>com.apple.private.persona-mgmt</key>
+	<true/>
+	
+	<!-- Allow writing to /var/mobile/Library/Preferences without breaking app container -->
 	<key>com.apple.private.security.storage.AppDataContainers</key>
 	<true/>
 	
-	<!-- Unlimited background execution without being suspended -->
-	<key>com.apple.multitasking.unlimited-background-continuation</key>
-	<true/>
+	<!-- Mach Lookup Exceptions for System Audio, Accessibility & Prefs Daemons -->
+	<key>com.apple.security.exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.mediaserverd</string>
+		<string>com.apple.audio.AudioSession</string>
+		<string>com.apple.accessibility.heard</string>
+		<string>com.apple.cfprefsd.daemon</string>
+		<string>com.apple.backboard.touchconsumer.systemapplication</string>
+		<string>com.apple.springboard.services</string>
+		<string>com.apple.backboard.display.services</string>
+	</array>
+	
+	<!-- Shared Preference Read-Write Permissions -->
+	<key>com.apple.security.exception.shared-preference.read-write</key>
+	<array>
+		<string>com.apple.HearingAids</string>
+		<string>com.apple.Accessibility</string>
+		<string>com.apple.celestial</string>
+		<string>com.apple.coreaudio</string>
+		<string>com.apple.mediaremote</string>
+		<string>com.apple.springboard</string>
+	</array>
 	
 	<!-- Audio background focus & bypass system attenuation -->
+	<key>com.apple.multitasking.unlimited-background-continuation</key>
+	<true/>
 	<key>com.apple.private.audio.bypass-attenuation</key>
 	<true/>
 	<key>com.apple.private.audio.session.allow-system-wide-focus</key>

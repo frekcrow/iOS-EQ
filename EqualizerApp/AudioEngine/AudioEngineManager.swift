@@ -34,6 +34,7 @@ public final class AudioEngineManager: NSObject {
         super.init()
         setupAudioSession()
         configureNodes()
+        attachNodes()
         connectNodes()
         setupTap()
         startEngineIfNeeded()
@@ -50,7 +51,11 @@ public final class AudioEngineManager: NSObject {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP, .allowBluetoothHFP, .mixWithOthers])
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: [.allowAirPlay, .allowBluetoothA2DP, .allowBluetoothHFP, .mixWithOthers]
+            )
             try session.setActive(true)
             
             NotificationCenter.default.addObserver(
@@ -92,7 +97,6 @@ public final class AudioEngineManager: NSObject {
     }
     
     @objc private func handleRouteChange(notification: Notification) {
-        // If headphones are unplugged, pause playback gracefully
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
@@ -104,7 +108,6 @@ public final class AudioEngineManager: NSObject {
     
     // MARK: - Node Setup
     private func configureNodes() {
-        // Configure 10-band equalizer initial filter parameters
         let frequencies = EQBand.standardFrequencies
         for (i, freq) in frequencies.enumerated() {
             let band = eqNode.bands[i]
@@ -122,7 +125,6 @@ public final class AudioEngineManager: NSObject {
             }
         }
         
-        // Initial Effect node defaults
         reverbNode.loadFactoryPreset(.mediumRoom)
         reverbNode.wetDryMix = 0.0
         reverbNode.bypass = true
@@ -142,35 +144,56 @@ public final class AudioEngineManager: NSObject {
         pitchNode.bypass = true
     }
     
-    private func connectNodes() {
+    private func attachNodes() {
         engine.attach(playerNode)
         engine.attach(eqNode)
         engine.attach(pitchNode)
         engine.attach(distortionNode)
         engine.attach(delayNode)
         engine.attach(reverbNode)
-        
-        let format = engine.outputNode.outputFormat(forBus: 0)
-        
-        // Signal Chain:
-        // playerNode -> eqNode -> pitchNode -> distortionNode -> delayNode -> reverbNode -> mainMixerNode -> outputNode
-        engine.connect(playerNode, to: eqNode, format: nil)
-        engine.connect(eqNode, to: pitchNode, format: nil)
-        engine.connect(pitchNode, to: distortionNode, format: nil)
-        engine.connect(distortionNode, to: delayNode, format: nil)
-        engine.connect(delayNode, to: reverbNode, format: nil)
-        engine.connect(reverbNode, to: engine.mainMixerNode, format: nil)
-        engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
-        
+    }
+    
+    public var defaultProcessingFormat: AVAudioFormat {
+        let hwFormat = engine.outputNode.outputFormat(forBus: 0)
+        let sampleRate = hwFormat.sampleRate > 0 ? hwFormat.sampleRate : 48000.0
+        let channelCount = hwFormat.channelCount > 0 ? hwFormat.channelCount : 2
+        return AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channelCount) ?? AVAudioFormat(standardFormatWithSampleRate: 48000.0, channels: 2)!
+    }
+    
+    private func connectNodes() {
+        reconnectProcessingChain(format: defaultProcessingFormat)
         engine.prepare()
     }
     
-    private func setupTap() {
-        // Install tap on mainMixerNode to extract real-time FFT magnitudes for visualizer
-        let mixer = engine.mainMixerNode
-        let format = mixer.outputFormat(forBus: 0)
+    private func reconnectProcessingChain(format: AVAudioFormat) {
+        engine.disconnectNodeOutput(playerNode)
+        engine.disconnectNodeOutput(eqNode)
+        engine.disconnectNodeOutput(pitchNode)
+        engine.disconnectNodeOutput(distortionNode)
+        engine.disconnectNodeOutput(delayNode)
+        engine.disconnectNodeOutput(reverbNode)
         
-        mixer.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        // Signal Chain:
+        // playerNode -> eqNode -> pitchNode -> distortionNode -> delayNode -> reverbNode -> mainMixerNode -> outputNode
+        engine.connect(playerNode, to: eqNode, format: format)
+        engine.connect(eqNode, to: pitchNode, format: format)
+        engine.connect(pitchNode, to: distortionNode, format: format)
+        engine.connect(distortionNode, to: delayNode, format: format)
+        engine.connect(delayNode, to: reverbNode, format: format)
+        engine.connect(reverbNode, to: engine.mainMixerNode, format: format)
+        
+        let outFormat = engine.outputNode.outputFormat(forBus: 0)
+        if outFormat.sampleRate > 0 && outFormat.channelCount > 0 {
+            engine.connect(engine.mainMixerNode, to: engine.outputNode, format: outFormat)
+        }
+        engine.mainMixerNode.outputVolume = 1.0
+        playerNode.volume = 1.0
+    }
+    
+    private func setupTap() {
+        let mixer = engine.mainMixerNode
+        mixer.removeTap(onBus: 0)
+        mixer.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             guard let self = self else { return }
             let magnitudes = self.fftAnalyzer.process(buffer: buffer)
             DispatchQueue.main.async {
@@ -186,6 +209,9 @@ public final class AudioEngineManager: NSObject {
     private func startEngineIfNeeded() {
         if !engine.isRunning {
             do {
+                #if os(iOS)
+                try AVAudioSession.sharedInstance().setActive(true)
+                #endif
                 try engine.start()
             } catch {
                 print("[AudioEngineManager] Engine start failed: \(error.localizedDescription)")
@@ -215,29 +241,24 @@ public final class AudioEngineManager: NSObject {
     
     // MARK: - Audio Effects Controls
     public func updateEffects(_ settings: AudioEffectSettings) {
-        // Reverb
         reverbNode.bypass = !settings.isReverbEnabled
         reverbNode.loadFactoryPreset(settings.reverbPreset.avPreset)
         reverbNode.wetDryMix = settings.reverbWetDryMix
         
-        // Delay
         delayNode.bypass = !settings.isDelayEnabled
         delayNode.delayTime = TimeInterval(settings.delayTime)
         delayNode.feedback = settings.delayFeedback
         delayNode.lowPassCutoff = settings.delayLowPassCutoff
         delayNode.wetDryMix = settings.delayWetDryMix
         
-        // Distortion
         distortionNode.bypass = !settings.isDistortionEnabled
         distortionNode.loadFactoryPreset(settings.distortionPreset.avPreset)
         distortionNode.wetDryMix = settings.distortionWetDryMix
         
-        // Pitch & Tempo
         pitchNode.bypass = !settings.isPitchEnabled
         pitchNode.pitch = settings.pitchCents
         pitchNode.rate = settings.playbackRate
         
-        // Master Volume & Pan
         engine.mainMixerNode.outputVolume = settings.masterVolume
         playerNode.pan = settings.panBalance
     }
@@ -259,6 +280,7 @@ public final class AudioEngineManager: NSObject {
         let formatDescription = "\(Int(sampleRate / 1000.0)) kHz • \(file.processingFormat.channelCount == 2 ? "Stereo" : "Mono")"
         let title = url.deletingPathExtension().lastPathComponent
         
+        reconnectProcessingChain(format: file.processingFormat)
         scheduleFile(fromTime: 0.0)
         return (title: title, duration: duration, format: formatDescription)
     }
@@ -268,7 +290,8 @@ public final class AudioEngineManager: NSObject {
         audioFile = nil
         
         let duration: Double = 8.0
-        guard let buffer = AudioToneGenerator.generateBuffer(type: type, duration: duration) else {
+        let format = defaultProcessingFormat
+        guard let buffer = AudioToneGenerator.generateBuffer(type: type, duration: duration, sampleRate: format.sampleRate) else {
             return (title: type.rawValue, duration: 0.0, format: "Synth PCM")
         }
         
@@ -276,8 +299,9 @@ public final class AudioEngineManager: NSObject {
         self.audioDuration = duration
         self.seekOffsetTime = 0.0
         
+        reconnectProcessingChain(format: format)
         schedulePCMBuffer(buffer: buffer)
-        return (title: type.rawValue, duration: duration, format: "44.1 kHz • Stereo Synth")
+        return (title: type.rawValue, duration: duration, format: "\(Int(format.sampleRate / 1000.0)) kHz • Stereo Synth")
     }
     
     // MARK: - Scheduling & Playback
@@ -375,7 +399,6 @@ public final class AudioEngineManager: NSObject {
     
     public func setLooping(_ looping: Bool) {
         self.isLoopingAudio = looping
-        // If playing PCM buffer, reschedule with updated looping option
         if let buffer = pcmBuffer, isPlayingAudio {
             schedulePCMBuffer(buffer: buffer)
             playerNode.play()

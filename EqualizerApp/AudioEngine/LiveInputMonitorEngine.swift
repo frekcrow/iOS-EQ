@@ -9,11 +9,10 @@ public final class LiveInputMonitorEngine: NSObject {
     private let engine = AVAudioEngine()
     private let micEQ = AVAudioUnitEQ(numberOfBands: 10)
     private let pitchShifter = AVAudioUnitTimePitch()
-    private let distortion = AVAudioUnitDistortion()
     private let fftAnalyzer = FFTAnalyzer(fftSize: 1024, numberOfVisualBands: 20)
     
     public private(set) var isRunning: Bool = false
-    public var micGain: Float = 1.0 // 0.0 to 4.0 (+12 dB boost)
+    public var micGain: Float = 1.0 // 0.0 to 3.0 (+10 dB boost)
     public var noiseGateThreshold: Float = -45.0 // dB
     public var isNoiseGateEnabled: Bool = true
     
@@ -22,6 +21,11 @@ public final class LiveInputMonitorEngine: NSObject {
     public override init() {
         super.init()
         configureMicNodes()
+        attachNodes()
+    }
+    
+    deinit {
+        stopMonitoring()
     }
     
     private func configureMicNodes() {
@@ -40,6 +44,11 @@ public final class LiveInputMonitorEngine: NSObject {
         pitchShifter.bypass = true
     }
     
+    private func attachNodes() {
+        engine.attach(micEQ)
+        engine.attach(pitchShifter)
+    }
+    
     public func startMonitoring() throws {
         guard !isRunning else { return }
         
@@ -47,45 +56,40 @@ public final class LiveInputMonitorEngine: NSObject {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(
             .playAndRecord,
-            mode: .measurement,
+            mode: .default,
             options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
         )
-        // Request ultra-low I/O buffer duration for real-time monitoring (approx 5.8ms)
         try session.setPreferredIOBufferDuration(0.005)
         try session.setActive(true)
         #endif
         
         let inputNode = engine.inputNode
-        let inputFormat = inputNode.inputFormat(forBus: 0)
+        let rawFormat = inputNode.inputFormat(forBus: 0)
+        let sampleRate = rawFormat.sampleRate > 0 ? rawFormat.sampleRate : 48000.0
+        let channelCount = rawFormat.channelCount > 0 ? rawFormat.channelCount : 1
+        guard let inputFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channelCount) else {
+            throw NSError(domain: "LiveInputMonitorEngine", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to configure microphone format"])
+        }
         
-        engine.attach(micEQ)
-        engine.attach(pitchShifter)
+        engine.disconnectNodeOutput(inputNode)
+        engine.disconnectNodeOutput(micEQ)
+        engine.disconnectNodeOutput(pitchShifter)
         
-        // Connect: InputNode -> micEQ -> pitchShifter -> mainMixer -> OutputNode
+        // Connect mic graph: InputNode -> micEQ -> pitchShifter -> mainMixer -> outputNode
         engine.connect(inputNode, to: micEQ, format: inputFormat)
         engine.connect(micEQ, to: pitchShifter, format: inputFormat)
         engine.connect(pitchShifter, to: engine.mainMixerNode, format: inputFormat)
         
-        // Install tap on input for FFT visualizer and software noise gate / mic gain
-        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 512, format: inputFormat) { [weak self] buffer, _ in
+        let outputFormat = engine.outputNode.outputFormat(forBus: 0)
+        if outputFormat.sampleRate > 0 && outputFormat.channelCount > 0 {
+            engine.connect(engine.mainMixerNode, to: engine.outputNode, format: outputFormat)
+        }
+        engine.mainMixerNode.outputVolume = 1.0
+        
+        // Tap on mainMixerNode for real-time visualizer
+        engine.mainMixerNode.removeTap(onBus: 0)
+        engine.mainMixerNode.installTap(onBus: 0, bufferSize: 512, format: nil) { [weak self] buffer, _ in
             guard let self = self else { return }
-            
-            // Apply software mic boost & noise gate
-            if let channelData = buffer.floatChannelData?[0] {
-                let frameCount = Int(buffer.frameLength)
-                var rms: Float = 0.0
-                vDSP_rmsqv(channelData, 1, &rms, vDSP_Length(frameCount))
-                let db = 20.0 * log10(max(0.00001, rms))
-                
-                if self.isNoiseGateEnabled && db < self.noiseGateThreshold {
-                    // Mute silent noise floor
-                    vDSP_vclr(channelData, 1, vDSP_Length(frameCount))
-                } else if self.micGain != 1.0 {
-                    var gain = self.micGain
-                    vDSP_vsmul(channelData, 1, &gain, channelData, 1, vDSP_Length(frameCount))
-                }
-            }
-            
             let mags = self.fftAnalyzer.process(buffer: buffer)
             DispatchQueue.main.async {
                 self.onMicMagnitudesUpdated?(mags)

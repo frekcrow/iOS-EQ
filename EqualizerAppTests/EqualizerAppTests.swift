@@ -118,4 +118,10 @@ final class EqualizerAppTests: XCTestCase {
         let env = TrollStoreEnvironment.shared
         XCTAssertNotNil(env.environment)
     }
+
+    func testResetSystemAudio() {
+        let success = SystemAudiogramManager.shared.resetToDefaultSystemAudio()
+        XCTAssertTrue(success)
+        XCTAssertFalse(SystemAudiogramManager.shared.isHeadphoneAccommodationsEnabled())
+    }
 }

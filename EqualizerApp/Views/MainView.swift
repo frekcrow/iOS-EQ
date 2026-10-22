@@ -216,19 +216,19 @@ public struct MainView: View {
             
             Spacer()
             
-            // Push / Sync Button
+            // Push & Restart Audio Daemon Button
             Button(action: {
                 withAnimation {
-                    viewModel.applySystemWideEQ()
+                    viewModel.applySystemWideEQ(restartDaemons: true)
                 }
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 12))
-                    Text("Apply to System")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11))
+                    Text("Apply & Restart")
+                        .font(.system(size: 11, weight: .bold))
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     Capsule().fill(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))

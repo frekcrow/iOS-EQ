@@ -22,6 +22,7 @@ let package = Package(
             exclude: [
                 "App/Info.plist",
                 "App/EqualizerApp.entitlements",
+                "EqualizerApp.entitlements",
                 "Assets.xcassets",
                 "Preview Content"
             ]

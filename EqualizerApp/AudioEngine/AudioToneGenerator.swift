@@ -27,7 +27,7 @@ public final class AudioToneGenerator {
     public static func generateBuffer(
         type: DemoSoundType,
         duration: Double = 6.0,
-        sampleRate: Double = 44100.0
+        sampleRate: Double = 48000.0
     ) -> AVAudioPCMBuffer? {
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else {
             return nil

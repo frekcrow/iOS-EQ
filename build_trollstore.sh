@@ -9,7 +9,11 @@ set -e
 APP_NAME="EqualizerApp"
 BUILD_DIR="build"
 OUTPUT_DIR="output"
-ENTITLEMENTS="EqualizerApp/App/EqualizerApp.entitlements"
+if [ -f "EqualizerApp/EqualizerApp.entitlements" ]; then
+    ENTITLEMENTS="EqualizerApp/EqualizerApp.entitlements"
+else
+    ENTITLEMENTS="EqualizerApp/App/EqualizerApp.entitlements"
+fi
 
 echo "=== Packaging Equalizer Pro for TrollStore (iOS 15.x+) ==="
 

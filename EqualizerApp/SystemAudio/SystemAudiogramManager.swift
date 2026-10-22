@@ -1,10 +1,14 @@
 import Foundation
+import CoreFoundation
 
 /// Controls system-wide Headphone Accommodations and Audiogram EQ curves on iOS 14.0 - 15.x.
 /// Applies frequency curves system-wide across all apps (Spotify, Apple Music, YouTube, Phone Calls)
-/// for AirPods, EarPods, and supported headphones using unsandboxed TrollStore/jailbreak access.
+/// for AirPods, EarPods, and supported headphones using CFPreferences and unsandboxed TrollStore/jailbreak access.
 public final class SystemAudiogramManager {
     public static let shared = SystemAudiogramManager()
+    
+    private let hearingAidsDomain = "com.apple.HearingAids" as CFString
+    private let accessibilityDomain = "com.apple.Accessibility" as CFString
     
     private let preferencesPath = "/var/mobile/Library/Preferences/com.apple.HearingAids.plist"
     private let accessibilityPath = "/var/mobile/Library/Preferences/com.apple.Accessibility.plist"
@@ -48,49 +52,46 @@ public final class SystemAudiogramManager {
     
     private init() {}
     
+    // MARK: - Query Status
+    
     /// Reads whether system Headphone Accommodations is currently enabled.
     public func isHeadphoneAccommodationsEnabled() -> Bool {
+        // First check CFPreferences cache
+        if let val = CFPreferencesCopyAppValue("HearingAidsAccommodationsEnabled" as CFString, hearingAidsDomain) {
+            if let boolVal = val as? Bool {
+                return boolVal
+            }
+        }
+        // Fallback to disk read
         guard let dict = NSDictionary(contentsOfFile: preferencesPath) as? [String: Any] else {
             return false
         }
         return (dict["HearingAidsAccommodationsEnabled"] as? Bool) ?? false
     }
     
-    /// Enables or disables system-wide Headphone Accommodations.
-    @discardableResult
-    public func setHeadphoneAccommodationsEnabled(_ enabled: Bool) -> Bool {
-        var dict = (NSDictionary(contentsOfFile: preferencesPath) as? [String: Any]) ?? [:]
-        dict["HearingAidsAccommodationsEnabled"] = enabled
-        dict["HearingAidsAccommodationsAppliesToPhone"] = true
-        dict["HearingAidsAccommodationsAppliesToMedia"] = true
+    // MARK: - CFPreferences Write Helper
+    
+    private func setPreference(key: String, value: Any?, domain: CFString) {
+        let cfKey = key as CFString
+        let cfValue = value as CFPropertyList?
         
-        let success = (dict as NSDictionary).write(toFile: preferencesPath, atomically: true)
-        postSettingsChangedNotification()
-        return success
+        // 1. Write for current user
+        CFPreferencesSetValue(cfKey, cfValue, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        
+        // 2. Also write explicitly for "mobile" user (daemons like heard read from mobile)
+        let mobileUser = "mobile" as CFString
+        CFPreferencesSetValue(cfKey, cfValue, domain, mobileUser, kCFPreferencesAnyHost)
+        CFPreferencesSynchronize(domain, mobileUser, kCFPreferencesAnyHost)
     }
     
-    /// Applies tuning mode and strength system-wide.
-    @discardableResult
-    public func applySystemTuning(tuning: TuningType, strength: BoostStrength) -> Bool {
-        var dict = (NSDictionary(contentsOfFile: preferencesPath) as? [String: Any]) ?? [:]
-        
-        dict["HearingAidsAccommodationsEnabled"] = true
-        dict["HearingAidsAccommodationsAppliesToPhone"] = true
-        dict["HearingAidsAccommodationsAppliesToMedia"] = true
-        dict["HearingAidsAccommodationsTuning"] = tuning.rawValue
-        dict["HearingAidsAccommodationsStrength"] = strength.rawValue
-        
-        let success = (dict as NSDictionary).write(toFile: preferencesPath, atomically: true)
-        postSettingsChangedNotification()
-        return success
-    }
+    // MARK: - Apply System Audiogram EQ
     
     /// Converts a 10-band EQ curve into an Apple 7-band Audiogram profile and injects it system-wide.
     @discardableResult
-    public func applyCustomAudiogramEQ(bandGains: [Float]) -> Bool {
+    public func applyCustomAudiogramEQ(bandGains: [Float], restartDaemons: Bool = false) -> Bool {
         // Map 10-band fader gains to 7 standard audiogram test frequencies:
         // [125, 250, 500, 1000, 2000, 4000, 8000]
-        // Standard baseline hearing is ~15 dB HL. A loss of +25 dB HL triggers iOS to boost that frequency!
         var audiogramGains: [Float] = []
         if bandGains.count >= 10 {
             audiogramGains = [
@@ -118,13 +119,6 @@ public final class SystemAudiogramManager {
             lossValues.append(calculatedLoss)
         }
         
-        var dict = (NSDictionary(contentsOfFile: preferencesPath) as? [String: Any]) ?? [:]
-        dict["HearingAidsAccommodationsEnabled"] = true
-        dict["HearingAidsAccommodationsAppliesToPhone"] = true
-        dict["HearingAidsAccommodationsAppliesToMedia"] = true
-        dict["HearingAidsAccommodationsTuning"] = TuningType.customAudiogram.rawValue
-        
-        // Inject Custom Audiogram Dictionary structure expected by iOS 14 / 15
         let audiogramDict: [String: Any] = [
             "Frequencies": Self.audiogramFrequencies.map { Double($0) },
             "LeftEarLoss": lossValues,
@@ -132,20 +126,126 @@ public final class SystemAudiogramManager {
             "DateCreated": Date().timeIntervalSince1970,
             "ProfileName": "Equalizer Pro System Profile"
         ]
-        dict["HearingAidsCustomAudiogram"] = audiogramDict
         
-        let success = (dict as NSDictionary).write(toFile: preferencesPath, atomically: true)
+        // 1. Write via CFPreferences (targeting both current user and 'mobile')
+        setPreference(key: "HearingAidsAccommodationsEnabled", value: true, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAppliesToPhone", value: true, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAppliesToMedia", value: true, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsTuning", value: TuningType.customAudiogram.rawValue, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsCustomAudiogram", value: audiogramDict, domain: hearingAidsDomain)
+        
+        // Also mirror in Accessibility domain
+        setPreference(key: "AXHeadphoneAccommodationsEnabled", value: true, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsCustomAudiogram", value: audiogramDict, domain: accessibilityDomain)
+        
+        // 2. Write direct to disk plists as backup
+        var hearingDict = (NSDictionary(contentsOfFile: preferencesPath) as? [String: Any]) ?? [:]
+        hearingDict["HearingAidsAccommodationsEnabled"] = true
+        hearingDict["HearingAidsAccommodationsAppliesToPhone"] = true
+        hearingDict["HearingAidsAccommodationsAppliesToMedia"] = true
+        hearingDict["HearingAidsAccommodationsTuning"] = TuningType.customAudiogram.rawValue
+        hearingDict["HearingAidsCustomAudiogram"] = audiogramDict
+        (hearingDict as NSDictionary).write(toFile: preferencesPath, atomically: true)
+        
+        var accessDict = (NSDictionary(contentsOfFile: accessibilityPath) as? [String: Any]) ?? [:]
+        accessDict["AXHeadphoneAccommodationsEnabled"] = true
+        accessDict["AXHeadphoneAccommodationsCustomAudiogram"] = audiogramDict
+        (accessDict as NSDictionary).write(toFile: accessibilityPath, atomically: true)
+        
+        // 3. Post Darwin notifications
         postSettingsChangedNotification()
-        return success
+        
+        // 4. Optionally restart audio daemons immediately
+        if restartDaemons {
+            TrollStoreEnvironment.shared.restartAudioEngine()
+        }
+        
+        return true
+    }
+    
+    // MARK: - Enable / Disable Accommodations
+    
+    @discardableResult
+    public func setHeadphoneAccommodationsEnabled(_ enabled: Bool, restartDaemons: Bool = false) -> Bool {
+        setPreference(key: "HearingAidsAccommodationsEnabled", value: enabled, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAppliesToPhone", value: enabled, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAppliesToMedia", value: enabled, domain: hearingAidsDomain)
+        setPreference(key: "AXHeadphoneAccommodationsEnabled", value: enabled, domain: accessibilityDomain)
+        
+        var dict = (NSDictionary(contentsOfFile: preferencesPath) as? [String: Any]) ?? [:]
+        dict["HearingAidsAccommodationsEnabled"] = enabled
+        (dict as NSDictionary).write(toFile: preferencesPath, atomically: true)
+        
+        postSettingsChangedNotification()
+        
+        if restartDaemons {
+            TrollStoreEnvironment.shared.restartAudioEngine()
+        }
+        return true
+    }
+    
+    // MARK: - Reset to Stock Default
+    
+    /// Resets all system audio accommodations and audiograms back to default un-equalized iOS state.
+    @discardableResult
+    public func resetToDefaultSystemAudio() -> Bool {
+        // Clear HearingAids preferences
+        setPreference(key: "HearingAidsAccommodationsEnabled", value: false, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsCustomAudiogram", value: nil, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsTuning", value: nil, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsStrength", value: nil, domain: hearingAidsDomain)
+        
+        // Clear Accessibility preferences
+        setPreference(key: "AXHeadphoneAccommodationsEnabled", value: false, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsCustomAudiogram", value: nil, domain: accessibilityDomain)
+        
+        // Clear disk plists
+        if var hearingDict = NSDictionary(contentsOfFile: preferencesPath) as? [String: Any] {
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsEnabled")
+            hearingDict.removeValue(forKey: "HearingAidsCustomAudiogram")
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsTuning")
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsStrength")
+            (hearingDict as NSDictionary).write(toFile: preferencesPath, atomically: true)
+        }
+        
+        if var accessDict = NSDictionary(contentsOfFile: accessibilityPath) as? [String: Any] {
+            accessDict.removeValue(forKey: "AXHeadphoneAccommodationsEnabled")
+            accessDict.removeValue(forKey: "AXHeadphoneAccommodationsCustomAudiogram")
+            (accessDict as NSDictionary).write(toFile: accessibilityPath, atomically: true)
+        }
+        
+        // Reset MediaServerd IPC shared configuration
+        MediaServerdIPC.shared.syncSettings(
+            bands: [Float](repeating: 0.0, count: 10),
+            preamp: 0.0,
+            isBypassed: true,
+            limiterEnabled: false
+        )
+        
+        postSettingsChangedNotification()
+        
+        // Restart daemons so stock sound is restored immediately
+        TrollStoreEnvironment.shared.restartAudioEngine()
+        return true
     }
     
     /// Broadcasts Darwin notifications to trigger immediate system daemon reload.
-    private func postSettingsChangedNotification() {
+    public func postSettingsChangedNotification() {
         let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
-        let name1 = CFNotificationName("com.apple.HearingAids.SettingsChanged" as CFString)
-        let name2 = CFNotificationName("com.apple.accessibility.heard.settings-changed" as CFString)
+        let names = [
+            "com.apple.HearingAids.SettingsChanged",
+            "com.apple.accessibility.heard.settings-changed",
+            "com.apple.Accessibility.PreferenceChanged"
+        ]
         
-        CFNotificationCenterPostNotification(notificationCenter, name1, nil, nil, true)
-        CFNotificationCenterPostNotification(notificationCenter, name2, nil, nil, true)
+        for name in names {
+            CFNotificationCenterPostNotification(
+                notificationCenter,
+                CFNotificationName(name as CFString),
+                nil,
+                nil,
+                true
+            )
+        }
     }
 }

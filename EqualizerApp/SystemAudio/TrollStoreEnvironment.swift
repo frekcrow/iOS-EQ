@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Detection and privileged execution utilities for TrollStore and jailbroken iOS 14.0-15.x environments.
 public final class TrollStoreEnvironment {
@@ -79,7 +80,7 @@ public final class TrollStoreEnvironment {
         }
     }
     
-    /// Spawns a process with posix_spawn for root actions (e.g. restarting audio daemon).
+    /// Spawns a process with posix_spawn for root actions.
     @discardableResult
     public func executePrivilegedCommand(executable: String, arguments: [String]) -> (exitCode: Int32, output: String) {
         var pid: pid_t = 0
@@ -130,15 +131,93 @@ public final class TrollStoreEnvironment {
         }
     }
     
-    /// Restarts mediaserverd so system audio daemon immediately picks up modified audio parameters.
-    public func restartMediaServerd() {
-        if environment == .jailbrokenRootless {
-            executePrivilegedCommand(executable: "/var/jb/usr/bin/killall", arguments: ["-9", "mediaserverd"])
-        } else if environment == .jailbrokenRootful {
-            executePrivilegedCommand(executable: "/usr/bin/killall", arguments: ["-9", "mediaserverd"])
-        } else {
-            // TrollStore mode fallback
-            executePrivilegedCommand(executable: "killall", arguments: ["-9", "mediaserverd"])
+    // MARK: - Direct Process Termination by Name
+    
+    /// Finds process IDs for a given executable name using Darwin sysctl.
+    public func findProcessPIDs(named processName: String) -> [pid_t] {
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var size: size_t = 0
+        guard sysctl(&mib, 4, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+        
+        let count = size / MemoryLayout<kinfo_proc>.size
+        var procList = [kinfo_proc](repeating: kinfo_proc(), count: count)
+        guard sysctl(&mib, 4, &procList, &size, nil, 0) == 0 else { return [] }
+        
+        var pids: [pid_t] = []
+        let target = processName.lowercased()
+        
+        for proc in procList {
+            let pid = proc.kp_proc.p_pid
+            if pid <= 0 { continue }
+            
+            var nameBuffer = [CChar](repeating: 0, count: Int(MAXCOMLEN) + 1)
+            nameBuffer.withUnsafeMutableBufferPointer { destPtr in
+                withUnsafePointer(to: proc.kp_proc.p_comm) { srcPtr in
+                    _ = memcpy(destPtr.baseAddress!, srcPtr, Int(MAXCOMLEN))
+                }
+            }
+            let name = String(cString: nameBuffer).lowercased()
+            if name == target || name.contains(target) {
+                pids.append(pid)
+            }
         }
+        return pids
+    }
+    
+    /// Kills a process by name using direct POSIX kill(pid, SIGKILL) with posix_spawnp fallback.
+    @discardableResult
+    public func killProcess(named processName: String) -> Bool {
+        let pids = findProcessPIDs(named: processName)
+        var killedAny = false
+        for pid in pids {
+            if kill(pid, SIGKILL) == 0 {
+                killedAny = true
+            }
+        }
+        
+        // Also invoke killall binary via posix_spawn as fallback
+        let spawnPaths = [
+            "/var/jb/usr/bin/killall",
+            "/usr/bin/killall",
+            "killall"
+        ]
+        for path in spawnPaths {
+            let res = executePrivilegedCommand(executable: path, arguments: ["-9", processName])
+            if res.exitCode == 0 {
+                killedAny = true
+                break
+            }
+        }
+        
+        return killedAny
+    }
+    
+    // MARK: - Daemon & Respring Management
+    
+    /// Restarts system audio daemons (mediaserverd & heard) so modified preferences are immediately reloaded.
+    @discardableResult
+    public func restartAudioEngine() -> Bool {
+        let killedMediaServer = killProcess(named: "mediaserverd")
+        let killedHeard = killProcess(named: "heard")
+        
+        // Also try launchctl kickstart if available
+        executePrivilegedCommand(executable: "launchctl", arguments: ["kickstart", "-k", "system/com.apple.mediaserverd"])
+        executePrivilegedCommand(executable: "launchctl", arguments: ["kickstart", "-k", "system/com.apple.accessibility.heard"])
+        
+        return killedMediaServer || killedHeard
+    }
+    
+    /// Performs a device respring by restarting SpringBoard & backboardd.
+    public func respring() {
+        // Try sbreload first (cleanest jailbreak respring)
+        let sbPaths = ["/var/jb/usr/bin/sbreload", "/usr/bin/sbreload", "sbreload"]
+        for path in sbPaths {
+            let res = executePrivilegedCommand(executable: path, arguments: [])
+            if res.exitCode == 0 { return }
+        }
+        
+        // Fallback: kill SpringBoard / backboardd directly
+        killProcess(named: "SpringBoard")
+        killProcess(named: "backboardd")
     }
 }

@@ -112,11 +112,11 @@ public final class EqualizerViewModel: ObservableObject {
     }
     
     // MARK: - System-Wide EQ Operations
-    public func applySystemWideEQ() {
+    public func applySystemWideEQ(restartDaemons: Bool = false) {
         let gains = bands.map { $0.gain }
         
-        // 1. Inject Audiogram into iOS Headphone Accommodations
-        let audiogramSuccess = audiogramManager.applyCustomAudiogramEQ(bandGains: gains)
+        // 1. Inject Audiogram into iOS Headphone Accommodations via CFPreferences & disk
+        let audiogramSuccess = audiogramManager.applyCustomAudiogramEQ(bandGains: gains, restartDaemons: restartDaemons)
         
         // 2. Sync with mediaserverd tweak / hook IPC
         let ipcSuccess = mediaServerdIPC.syncSettings(
@@ -128,14 +128,16 @@ public final class EqualizerViewModel: ObservableObject {
         
         if audiogramSuccess || ipcSuccess {
             isSystemEQActive = true
-            systemStatusMessage = "System EQ curve applied globally to AirPods & Headphones!"
+            systemStatusMessage = restartDaemons
+                ? "System EQ synced and audio daemons restarted!"
+                : "System EQ curve synced to CFPreferences (tap Restart Audio to apply)."
         } else {
             systemStatusMessage = "Could not write system preferences. Ensure TrollStore or Jailbreak is active."
         }
     }
     
     public func disableSystemWideEQ() {
-        audiogramManager.setHeadphoneAccommodationsEnabled(false)
+        audiogramManager.setHeadphoneAccommodationsEnabled(false, restartDaemons: true)
         mediaServerdIPC.syncSettings(
             bands: bands.map { _ in 0.0 },
             preamp: 0.0,
@@ -146,15 +148,30 @@ public final class EqualizerViewModel: ObservableObject {
         systemStatusMessage = "System-wide EQ bypassed."
     }
     
+    public func resetSystemAudioToDefault() {
+        audiogramManager.resetToDefaultSystemAudio()
+        isSystemEQActive = false
+        resetToFlat()
+        systemStatusMessage = "System audio and audiograms successfully reset to stock iOS default."
+    }
+    
     public func disableHeadphoneSafetyLimit() {
         let success = systemController.disableHeadphoneVolumeLimit()
         isHeadphoneLimitDisabled = success
         systemStatusMessage = success ? "EU 85dB volume cap removed." : "Unable to override limit."
     }
     
-    public func restartAudioDaemon() {
-        trollStoreEnv.restartMediaServerd()
-        systemStatusMessage = "mediaserverd restarted."
+    public func restartAudioEngine() {
+        let _ = trollStoreEnv.restartAudioEngine()
+        systemStatusMessage = "Audio daemons (mediaserverd & heard) restarted."
+        refreshSystemStatus()
+    }
+    
+    public func respring() {
+        systemStatusMessage = "Respringing device..."
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.trollStoreEnv.respring()
+        }
     }
     
     // MARK: - Live Microphone Monitoring
