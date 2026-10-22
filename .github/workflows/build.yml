@@ -1,8 +1,6 @@
 name: Build iOS-EQ IPA
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch: # يتيح لك تشغيل البناء يدوياً من موقع GitHub في أي وقت
 
 jobs:
