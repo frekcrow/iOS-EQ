@@ -64,11 +64,14 @@ public final class MediaServerdIPC {
         addr.sun_family = sa_family_t(AF_UNIX)
         
         let pathBytes = eqeSocketPath.utf8CString
-        guard pathBytes.count <= MemoryLayout.size(ofValue: addr.sun_path) else { return false }
+        let maxPathLen = MemoryLayout.size(ofValue: addr.sun_path)
+        guard pathBytes.count <= maxPathLen else { return false }
         
-        _ = withUnsafeMutablePointer(to: &addr.sun_path.0) { ptr in
-            eqeSocketPath.withCString { cstr in
-                strncpy(ptr, cstr, MemoryLayout.size(ofValue: addr.sun_path))
+        withUnsafeMutableBytes(of: &addr.sun_path) { rawBuffer in
+            if let baseAddress = rawBuffer.baseAddress?.assumingMemoryBound(to: CChar.self) {
+                eqeSocketPath.withCString { cstr in
+                    strncpy(baseAddress, cstr, maxPathLen)
+                }
             }
         }
         

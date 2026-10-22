@@ -48,7 +48,7 @@ public final class LiveInputMonitorEngine: NSObject {
         try session.setCategory(
             .playAndRecord,
             mode: .measurement,
-            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+            options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
         )
         // Request ultra-low I/O buffer duration for real-time monitoring (approx 5.8ms)
         try session.setPreferredIOBufferDuration(0.005)

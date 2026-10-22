@@ -50,7 +50,7 @@ public final class AudioEngineManager: NSObject {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetooth, .mixWithOthers])
+            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP, .allowBluetoothHFP, .mixWithOthers])
             try session.setActive(true)
             
             NotificationCenter.default.addObserver(
