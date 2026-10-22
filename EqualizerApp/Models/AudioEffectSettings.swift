@@ -52,7 +52,7 @@ public enum DistortionPresetOption: Int, CaseIterable, Identifiable {
         switch self {
         case .drumsLoFi: return .drumsLoFi
         case .multiBrokenSpeaker: return .multiBrokenSpeaker
-        case .speechRadio: return .speechRadio
+        case .speechRadioTower: return .speechRadioTower
         case .electricGuitar: return .multiEchoTight1
         case .multiEcho1: return .multiEcho2
         }
@@ -62,7 +62,7 @@ public enum DistortionPresetOption: Int, CaseIterable, Identifiable {
         switch self {
         case .drumsLoFi: return "Lo-Fi Drums"
         case .multiBrokenSpeaker: return "Broken Speaker"
-        case .speechRadio: return "Vintage Radio"
+        case .speechRadioTower: return "Vintage Radio"
         case .electricGuitar: return "Warm Overdrive"
         case .multiEcho1: return "Echo Chamber"
         }
