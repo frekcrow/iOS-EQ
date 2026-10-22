@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// Preset selection sheet showing Factory & Custom user presets with mini curve badges.
+/// Fully compatible with iOS 14.0 - 15.x.
 public struct PresetSelectorView: View {
     @ObservedObject var viewModel: EqualizerViewModel
     @Environment(\.presentationMode) var presentationMode
     
     @State private var selectedTab: Int = 0 // 0: Factory, 1: Custom
     @State private var newPresetName: String = ""
-    @State private var showingSaveAlert: Bool = false
+    @State private var isShowingCreateField: Bool = false
     
     public init(viewModel: EqualizerViewModel) {
         self.viewModel = viewModel
@@ -42,40 +43,70 @@ public struct PresetSelectorView: View {
                         // Custom presets list
                         VStack(spacing: 12) {
                             // "Save Current EQ as Preset" card
-                            Button(action: {
-                                showingSaveAlert = true
-                            }) {
+                            if isShowingCreateField {
                                 HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.cyan)
+                                    TextField("New Preset Name", text: $newPresetName)
+                                        .textFieldStyle(PlainTextFieldStyle())
+                                        .padding(10)
+                                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1)))
+                                        .foregroundColor(.white)
                                     
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Save Current EQ as New Preset")
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundColor(.white)
-                                        Text("Store current 10-band slider gains")
-                                            .font(.system(size: 11))
+                                    Button("Save") {
+                                        viewModel.saveCustomPreset(name: newPresetName)
+                                        newPresetName = ""
+                                        isShowingCreateField = false
+                                    }
+                                    .font(.system(size: 13, weight: .bold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Capsule().fill(Color.cyan))
+                                    .foregroundColor(.black)
+                                    
+                                    Button("Cancel") {
+                                        isShowingCreateField = false
+                                    }
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
+                                .padding(.horizontal, 16)
+                            } else {
+                                Button(action: {
+                                    isShowingCreateField = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(.cyan)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Save Current EQ as New Preset")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.white)
+                                            Text("Store current 10-band slider gains")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .bold))
                                             .foregroundColor(.secondary)
                                     }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.secondary)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.cyan.opacity(0.12))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                                            )
+                                    )
                                 }
-                                .padding(14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.cyan.opacity(0.12))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
-                                        )
-                                )
+                                .padding(.horizontal, 16)
                             }
-                            .padding(.horizontal, 16)
                             
                             if viewModel.customPresets.isEmpty {
                                 Spacer()
@@ -119,18 +150,6 @@ public struct PresetSelectorView: View {
                     .foregroundColor(.cyan)
                 }
             }
-            .alert("Save Custom Preset", isPresented: $showingSaveAlert) {
-                TextField("Preset Name", text: $newPresetName)
-                Button("Save") {
-                    viewModel.saveCustomPreset(name: newPresetName)
-                    newPresetName = ""
-                }
-                Button("Cancel", role: .cancel) {
-                    newPresetName = ""
-                }
-            } message: {
-                Text("Enter a unique name for your custom EQ curve.")
-            }
         }
     }
     
@@ -154,7 +173,7 @@ public struct PresetSelectorView: View {
                 // Name & Category
                 VStack(alignment: .leading, spacing: 2) {
                     Text(preset.name)
-                        .font(.system(size: 15, weight: isSelected ? .bold : .medium))
+                        .font(.system(size: 14, weight: isSelected ? .bold : .medium))
                         .foregroundColor(isSelected ? .white : .primary)
                     
                     Text(preset.category.rawValue)

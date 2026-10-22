@@ -28,6 +28,13 @@
 		EA010013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA020015 /* Assets.xcassets */; };
 		EA010014 /* PreviewAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA020016 /* PreviewAssets.xcassets */; };
 		EA010015 /* EqualizerAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020017 /* EqualizerAppTests.swift */; };
+		EA010016 /* TrollStoreEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001A /* TrollStoreEnvironment.swift */; };
+		EA010017 /* SystemAudiogramManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001B /* SystemAudiogramManager.swift */; };
+		EA010018 /* AVSystemControllerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001C /* AVSystemControllerBridge.swift */; };
+		EA010019 /* MediaServerdIPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001D /* MediaServerdIPC.swift */; };
+		EA01001A /* LiveInputMonitorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001E /* LiveInputMonitorEngine.swift */; };
+		EA01001B /* SystemAudioSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001F /* SystemAudioSheetView.swift */; };
+		EA01001C /* MicControlBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020020 /* MicControlBarView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +72,14 @@
 		EA020016 /* PreviewAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = PreviewAssets.xcassets; sourceTree = "<group>"; };
 		EA020017 /* EqualizerAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EqualizerAppTests.swift; sourceTree = "<group>"; };
 		EA020018 /* EqualizerAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EqualizerAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA020019 /* EqualizerApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EqualizerApp.entitlements; sourceTree = "<group>"; };
+		EA02001A /* TrollStoreEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrollStoreEnvironment.swift; sourceTree = "<group>"; };
+		EA02001B /* SystemAudiogramManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudiogramManager.swift; sourceTree = "<group>"; };
+		EA02001C /* AVSystemControllerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVSystemControllerBridge.swift; sourceTree = "<group>"; };
+		EA02001D /* MediaServerdIPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaServerdIPC.swift; sourceTree = "<group>"; };
+		EA02001E /* LiveInputMonitorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInputMonitorEngine.swift; sourceTree = "<group>"; };
+		EA02001F /* SystemAudioSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioSheetView.swift; sourceTree = "<group>"; };
+		EA020020 /* MicControlBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicControlBarView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +124,7 @@
 				EA030004 /* App */,
 				EA030005 /* Models */,
 				EA030006 /* AudioEngine */,
+				EA03000D /* SystemAudio */,
 				EA030007 /* ViewModels */,
 				EA030008 /* Views */,
 				EA03000A /* Storage */,
@@ -123,6 +139,7 @@
 			children = (
 				EA020002 /* EqualizerApp.swift */,
 				EA020003 /* Info.plist */,
+				EA020019 /* EqualizerApp.entitlements */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -144,8 +161,20 @@
 				EA020008 /* FFTAnalyzer.swift */,
 				EA020009 /* AudioToneGenerator.swift */,
 				EA02000A /* AudioEngineManager.swift */,
+				EA02001E /* LiveInputMonitorEngine.swift */,
 			);
 			path = AudioEngine;
+			sourceTree = "<group>";
+		};
+		EA03000D /* SystemAudio */ = {
+			isa = PBXGroup;
+			children = (
+				EA02001A /* TrollStoreEnvironment.swift */,
+				EA02001B /* SystemAudiogramManager.swift */,
+				EA02001C /* AVSystemControllerBridge.swift */,
+				EA02001D /* MediaServerdIPC.swift */,
+			);
+			path = SystemAudio;
 			sourceTree = "<group>";
 		};
 		EA030007 /* ViewModels */ = {
@@ -175,6 +204,8 @@
 				EA020011 /* PlayerControlBarView.swift */,
 				EA020012 /* PresetSelectorView.swift */,
 				EA020013 /* EffectsRackView.swift */,
+				EA02001F /* SystemAudioSheetView.swift */,
+				EA020020 /* MicControlBarView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -321,6 +352,13 @@
 				EA010010 /* PresetSelectorView.swift in Sources */,
 				EA010011 /* EffectsRackView.swift in Sources */,
 				EA010012 /* DocumentPicker.swift in Sources */,
+				EA010016 /* TrollStoreEnvironment.swift in Sources */,
+				EA010017 /* SystemAudiogramManager.swift in Sources */,
+				EA010018 /* AVSystemControllerBridge.swift in Sources */,
+				EA010019 /* MediaServerdIPC.swift in Sources */,
+				EA01001A /* LiveInputMonitorEngine.swift in Sources */,
+				EA01001B /* SystemAudioSheetView.swift in Sources */,
+				EA01001C /* MicControlBarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -392,7 +430,7 @@
 				GCC_WARN_UNDEFINED_VARIABLES = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -445,7 +483,7 @@
 				GCC_WARN_UNDEFINED_VARIABLES = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -460,17 +498,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EqualizerApp/App/EqualizerApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"EqualizerApp/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = EqualizerApp/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.equalizer.EqualizerApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -484,17 +524,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EqualizerApp/App/EqualizerApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"EqualizerApp/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = EqualizerApp/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.equalizer.EqualizerApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -508,9 +550,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.equalizer.EqualizerAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -525,9 +568,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.equalizer.EqualizerAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

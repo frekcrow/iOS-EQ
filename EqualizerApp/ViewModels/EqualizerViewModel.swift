@@ -2,44 +2,94 @@ import Foundation
 import Combine
 import SwiftUI
 
-/// Main ViewModel coordinating Equalizer audio processing, presets, spectrum metering, and transport controls.
+/// Operational Mode of Equalizer Pro.
+public enum AppAudioMode: String, CaseIterable, Identifiable {
+    case systemWide = "System Audio"
+    case microphoneDSP = "Mic / Voice"
+    case mediaPlayer = "Studio Player"
+    
+    public var id: String { rawValue }
+    
+    public var iconName: String {
+        switch self {
+        case .systemWide: return "headphones"
+        case .microphoneDSP: return "mic.fill"
+        case .mediaPlayer: return "music.note"
+        }
+    }
+}
+
+/// Main ViewModel coordinating Equalizer audio processing, system-wide Audiograms,
+/// live microphone hardware monitoring, and media playback on iOS 14.0-15.x.
 public final class EqualizerViewModel: ObservableObject {
     
-    // MARK: - Published Properties
+    // MARK: - App Operating Mode
+    @Published public var audioMode: AppAudioMode = .systemWide
+    
+    // MARK: - Jailbreak & Environment Status
+    @Published public var environmentName: String = ""
+    @Published public var isUnsandboxed: Bool = false
+    @Published public var activeAudioRoute: String = "Built-in Speaker / AirPods"
+    
+    // MARK: - System-Wide Headphone Accommodations & Audiogram
+    @Published public var isSystemEQActive: Bool = false
+    @Published public var systemTuning: SystemAudiogramManager.TuningType = .customAudiogram
+    @Published public var systemStrength: SystemAudiogramManager.BoostStrength = .moderate
+    @Published public var isHeadphoneLimitDisabled: Bool = false
+    @Published public var systemStatusMessage: String = ""
+    
+    // MARK: - Live Hardware Microphone & Voice DSP
+    @Published public var isMicMonitoring: Bool = false
+    @Published public var micGain: Float = 1.0 // 1.0 = normal, up to 3.0 (+10 dB)
+    @Published public var isNoiseGateEnabled: Bool = true
+    @Published public var voicePitchCents: Float = 0.0 // -1200 to +1200
+    
+    // MARK: - Equalizer Bands & Presets
     @Published public var bands: [EQBand]
     @Published public var activePreset: EQPreset
     @Published public var systemPresets: [EQPreset]
     @Published public var customPresets: [EQPreset]
-    @Published public var currentTrack: AudioTrack
+    @Published public var isEQBypassed: Bool = false
+    @Published public var preampGain: Float = 0.0 // dB (-12 to +12)
+    @Published public var spectrumMagnitudes: [Float] = Array(repeating: 0.0, count: 20)
     
+    // MARK: - Built-in Studio Media Player
+    @Published public var currentTrack: AudioTrack
     @Published public var isPlaying: Bool = false
     @Published public var currentTime: TimeInterval = 0.0
     @Published public var duration: TimeInterval = 0.0
     @Published public var isLooping: Bool = true
-    
-    @Published public var spectrumMagnitudes: [Float] = Array(repeating: 0.0, count: 20)
-    @Published public var isEQBypassed: Bool = false
-    @Published public var preampGain: Float = 0.0 // dB (-12 to +12)
     @Published public var effects: AudioEffectSettings = AudioEffectSettings()
     
+    // MARK: - Sheet & Alert Presentation Flags
     @Published public var errorMessage: String? = nil
     @Published public var showErrorAlert: Bool = false
     @Published public var isFilePickerPresented: Bool = false
     @Published public var isPresetsSheetPresented: Bool = false
     @Published public var isEffectsSheetPresented: Bool = false
-    @Published public var isSavePresetDialogPresented: Bool = false
+    @Published public var isSystemSettingsPresented: Bool = false
     
-    // MARK: - Private Engine & Services
+    // MARK: - Engines & Managers
     private let audioEngine: AudioEngineManager
+    private let micEngine: LiveInputMonitorEngine
     private let presetStore: PresetStore
-    private var cancellables = Set<AnyCancellable>()
+    private let audiogramManager: SystemAudiogramManager
+    private let systemController: AVSystemControllerBridge
+    private let trollStoreEnv: TrollStoreEnvironment
+    private let mediaServerdIPC: MediaServerdIPC
     
     public init(
         audioEngine: AudioEngineManager = AudioEngineManager(),
+        micEngine: LiveInputMonitorEngine = LiveInputMonitorEngine(),
         presetStore: PresetStore = PresetStore()
     ) {
         self.audioEngine = audioEngine
+        self.micEngine = micEngine
         self.presetStore = presetStore
+        self.audiogramManager = SystemAudiogramManager.shared
+        self.systemController = AVSystemControllerBridge.shared
+        self.trollStoreEnv = TrollStoreEnvironment.shared
+        self.mediaServerdIPC = MediaServerdIPC.shared
         
         self.bands = EQBand.defaultBands
         self.activePreset = .flat
@@ -48,13 +98,103 @@ public final class EqualizerViewModel: ObservableObject {
         self.currentTrack = .placeholder
         
         setupEngineCallbacks()
+        refreshSystemStatus()
         loadInitialDemoAudio()
+    }
+    
+    // MARK: - System Audio Status Refresh
+    public func refreshSystemStatus() {
+        trollStoreEnv.refresh()
+        self.environmentName = trollStoreEnv.environment.rawValue
+        self.isUnsandboxed = trollStoreEnv.isUnsandboxed
+        self.activeAudioRoute = systemController.getActiveAudioRoute()
+        self.isSystemEQActive = audiogramManager.isHeadphoneAccommodationsEnabled()
+    }
+    
+    // MARK: - System-Wide EQ Operations
+    public func applySystemWideEQ() {
+        let gains = bands.map { $0.gain }
+        
+        // 1. Inject Audiogram into iOS Headphone Accommodations
+        let audiogramSuccess = audiogramManager.applyCustomAudiogramEQ(bandGains: gains)
+        
+        // 2. Sync with mediaserverd tweak / hook IPC
+        let ipcSuccess = mediaServerdIPC.syncSettings(
+            bands: gains,
+            preamp: preampGain,
+            isBypassed: isEQBypassed,
+            limiterEnabled: true
+        )
+        
+        if audiogramSuccess || ipcSuccess {
+            isSystemEQActive = true
+            systemStatusMessage = "System EQ curve applied globally to AirPods & Headphones!"
+        } else {
+            systemStatusMessage = "Could not write system preferences. Ensure TrollStore or Jailbreak is active."
+        }
+    }
+    
+    public func disableSystemWideEQ() {
+        audiogramManager.setHeadphoneAccommodationsEnabled(false)
+        mediaServerdIPC.syncSettings(
+            bands: bands.map { _ in 0.0 },
+            preamp: 0.0,
+            isBypassed: true,
+            limiterEnabled: false
+        )
+        isSystemEQActive = false
+        systemStatusMessage = "System-wide EQ bypassed."
+    }
+    
+    public func disableHeadphoneSafetyLimit() {
+        let success = systemController.disableHeadphoneVolumeLimit()
+        isHeadphoneLimitDisabled = success
+        systemStatusMessage = success ? "EU 85dB volume cap removed." : "Unable to override limit."
+    }
+    
+    public func restartAudioDaemon() {
+        trollStoreEnv.restartMediaServerd()
+        systemStatusMessage = "mediaserverd restarted."
+    }
+    
+    // MARK: - Live Microphone Monitoring
+    public func toggleMicMonitoring() {
+        if isMicMonitoring {
+            micEngine.stopMonitoring()
+            isMicMonitoring = false
+        } else {
+            do {
+                // If media player was running, pause it first
+                if isPlaying { pause() }
+                try micEngine.startMonitoring()
+                isMicMonitoring = true
+            } catch {
+                errorMessage = "Microphone error: \(error.localizedDescription)"
+                showErrorAlert = true
+            }
+        }
+    }
+    
+    public func setMicGain(_ gain: Float) {
+        micGain = gain
+        micEngine.micGain = gain
+    }
+    
+    public func setVoicePitch(cents: Float) {
+        voicePitchCents = cents
+        micEngine.setVoicePitch(cents: cents)
+    }
+    
+    public func toggleNoiseGate() {
+        isNoiseGateEnabled.toggle()
+        micEngine.isNoiseGateEnabled = isNoiseGateEnabled
     }
     
     // MARK: - Engine Callbacks
     private func setupEngineCallbacks() {
         audioEngine.onMagnitudesUpdated = { [weak self] magnitudes in
-            self?.spectrumMagnitudes = magnitudes
+            guard let self = self, self.audioMode == .mediaPlayer else { return }
+            self.spectrumMagnitudes = magnitudes
         }
         
         audioEngine.onPlaybackProgress = { [weak self] current, total in
@@ -65,55 +205,33 @@ public final class EqualizerViewModel: ObservableObject {
         audioEngine.onPlaybackEnded = { [weak self] in
             self?.isPlaying = false
         }
-    }
-    
-    private func loadInitialDemoAudio() {
-        // Load default synthesized harmonic sound so the user can immediately hit Play
-        loadDemoTone(.synthChord)
-    }
-    
-    // MARK: - Transport Controls
-    public func togglePlayPause() {
-        if isPlaying {
-            pause()
-        } else {
-            play()
+        
+        micEngine.onMicMagnitudesUpdated = { [weak self] magnitudes in
+            guard let self = self, self.audioMode == .microphoneDSP else { return }
+            self.spectrumMagnitudes = magnitudes
         }
     }
     
-    public func play() {
-        audioEngine.play()
-        isPlaying = true
-    }
-    
-    public func pause() {
-        audioEngine.pause()
-        isPlaying = false
-    }
-    
-    public func stop() {
-        audioEngine.stop()
-        isPlaying = false
-        currentTime = 0.0
-    }
-    
-    public func seek(to time: TimeInterval) {
-        audioEngine.seek(to: time)
-        currentTime = time
-    }
-    
-    public func toggleLoop() {
-        isLooping.toggle()
-        audioEngine.setLooping(isLooping)
+    private func loadInitialDemoAudio() {
+        loadDemoTone(.synthChord)
     }
     
     // MARK: - Equalizer Band Operations
     public func setBandGain(index: Int, gain: Float) {
         guard index >= 0 && index < bands.count else { return }
         bands[index].gain = max(-12.0, min(12.0, gain))
+        
+        // Update audio engine
         audioEngine.setBandGain(index: index, gain: bands[index].gain, bypass: bands[index].bypass)
         
-        // If modified away from preset, indicate custom configuration
+        // Update mic engine if in mic mode
+        micEngine.setMicBandGain(index: index, gain: bands[index].gain)
+        
+        // Auto-sync if system-wide EQ is currently active
+        if isSystemEQActive && audioMode == .systemWide {
+            applySystemWideEQ()
+        }
+        
         if activePreset.isSystem {
             activePreset = EQPreset(
                 name: "Custom",
@@ -134,14 +252,24 @@ public final class EqualizerViewModel: ObservableObject {
     public func toggleMasterEQBypass() {
         isEQBypassed.toggle()
         audioEngine.setEQBypass(isEQBypassed)
+        if isSystemEQActive {
+            if isEQBypassed {
+                disableSystemWideEQ()
+            } else {
+                applySystemWideEQ()
+            }
+        }
     }
     
     public func setPreampGain(_ gain: Float) {
         preampGain = max(-12.0, min(12.0, gain))
-        // Apply linear scale to main mixer or effects preamp
         let linearMultiplier = pow(10.0, preampGain / 20.0)
         effects.masterVolume = min(1.0, linearMultiplier)
         audioEngine.updateEffects(effects)
+        
+        if isSystemEQActive {
+            applySystemWideEQ()
+        }
     }
     
     public func resetToFlat() {
@@ -155,9 +283,14 @@ public final class EqualizerViewModel: ObservableObject {
             if i < bands.count {
                 bands[i].gain = gain
                 bands[i].bypass = false
+                micEngine.setMicBandGain(index: i, gain: gain)
             }
         }
         audioEngine.setAllBandGains(preset.gains)
+        
+        if isSystemEQActive {
+            applySystemWideEQ()
+        }
     }
     
     public func saveCustomPreset(name: String) {
@@ -183,18 +316,55 @@ public final class EqualizerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Audio Effects Rack
+    // MARK: - Transport Controls
+    public func togglePlayPause() {
+        if isPlaying {
+            pause()
+        } else {
+            play()
+        }
+    }
+    
+    public func play() {
+        if isMicMonitoring {
+            micEngine.stopMonitoring()
+            isMicMonitoring = false
+        }
+        audioEngine.play()
+        isPlaying = true
+    }
+    
+    public func pause() {
+        audioEngine.pause()
+        isPlaying = false
+    }
+    
+    public func stop() {
+        audioEngine.stop()
+        isPlaying = false
+        currentTime = 0.0
+    }
+    
+    public func seek(to time: TimeInterval) {
+        audioEngine.seek(to: time)
+        currentTime = time
+    }
+    
+    public func toggleLoop() {
+        isLooping.toggle()
+        audioEngine.setLooping(isLooping)
+    }
+    
     public func updateEffects() {
         audioEngine.updateEffects(effects)
     }
     
-    // MARK: - Audio Loading
     public func loadAudioFile(url: URL) {
         do {
             let info = try audioEngine.loadAudioFile(url: url)
             currentTrack = AudioTrack(
                 title: info.title,
-                artist: "Imported File",
+                artist: "Imported Audio",
                 album: "User Library",
                 duration: info.duration,
                 fileURL: url,

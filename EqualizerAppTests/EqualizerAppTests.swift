@@ -105,4 +105,17 @@ final class EqualizerAppTests: XCTestCase {
             XCTAssertNotNil(buffer?.floatChannelData?[1])
         }
     }
+
+    // MARK: - System Audiogram Tests
+    func testAudiogramFrequencyMapping() {
+        let freqs = SystemAudiogramManager.audiogramFrequencies
+        XCTAssertEqual(freqs.count, 7)
+        XCTAssertEqual(freqs, [125, 250, 500, 1000, 2000, 4000, 8000])
+    }
+
+    // MARK: - TrollStore Environment Tests
+    func testTrollStoreEnvironmentDetection() {
+        let env = TrollStoreEnvironment.shared
+        XCTAssertNotNil(env.environment)
+    }
 }

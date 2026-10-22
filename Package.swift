@@ -4,8 +4,8 @@ import PackageDescription
 let package = Package(
     name: "EqualizerApp",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12)
+        .iOS(.v14),
+        .macOS(.v11)
     ],
     products: [
         .library(
@@ -21,6 +21,7 @@ let package = Package(
             path: "EqualizerApp",
             exclude: [
                 "App/Info.plist",
+                "App/EqualizerApp.entitlements",
                 "Assets.xcassets",
                 "Preview Content"
             ]

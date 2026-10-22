@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Unsandboxed execution for TrollStore and Jailbreak -->
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	
+	<!-- Platform application rights -->
+	<key>platform-application</key>
+	<true/>
+	
+	<!-- Allow writing to /var/mobile/Library/Preferences and system storage -->
+	<key>com.apple.private.security.storage.AppDataContainers</key>
+	<true/>
+	
+	<!-- Unlimited background execution without being suspended -->
+	<key>com.apple.multitasking.unlimited-background-continuation</key>
+	<true/>
+	
+	<!-- Audio background focus & bypass system attenuation -->
+	<key>com.apple.private.audio.bypass-attenuation</key>
+	<true/>
+	<key>com.apple.private.audio.session.allow-system-wide-focus</key>
+	<true/>
+	<key>com.apple.private.audio.session.hardware-mute-override</key>
+	<true/>
+	
+	<!-- SpringBoard sensitive URL scheme trigger -->
+	<key>com.apple.springboard.opensensitiveurl</key>
+	<true/>
+	
+	<key>get-task-allow</key>
+	<false/>
+</dict>
+</plist>

@@ -1,140 +1,138 @@
-# Equalizer Pro (iOS)
+# Equalizer Pro (iOS 14.0 - 15.x)
+### System-Wide Audio DSP & Equalizer for TrollStore & Jailbroken Devices
 
-A studio-grade 10-band graphic equalizer and digital signal processor (DSP) app built natively for iOS with **Swift**, **SwiftUI**, and **AVFoundation**.
+**Equalizer Pro** is an unsandboxed, studio-grade 10-band graphic equalizer, digital signal processor (DSP), and hardware audio controller designed specifically for **TrollStore** and **jailbroken iOS devices (iOS 14.0 - 15.x)** (Dopamine, unc0ver, Taurine, palera1n).
 
----
-
-## 🎧 Highlights & Features
-
-- **10-Band Graphic Equalizer**:
-  - ISO Standard frequencies: **32 Hz, 64 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz**.
-  - High-precision tactile hardware faders with -12.0 dB to +12.0 dB range.
-  - Zero-center detent snapping and double-tap to reset.
-  - Interactive smooth spline curve visualization displaying the exact frequency response.
-  - Per-band bypass switches and Master EQ bypass switch.
-  - Preamp input trim slider (-12 dB to +12 dB).
-
-- **Real-Time FFT Spectrum Visualizer**:
-  - Accelerated Fast Fourier Transform (vDSP) processing using Apple's **Accelerate framework**.
-  - Dynamic glowing 20-band neon spectrum bars with logarithmic frequency spacing.
-  - Calibrated decibel reference grid (-36 dB, -18 dB, -6 dB, 0 dB) and smooth falloff decay.
-
-- **Audio Engine & DSP Rack (`AVAudioEngine`)**:
-  - **Reverb Unit**: Factory room models (Small Room, Medium Room, Large Room, Medium Hall, Large Hall, Plate, Cathedral) with wet/dry balance.
-  - **Stereo Delay / Echo**: Delay time (0.05s to 1.0s), feedback control, and wet/dry mix.
-  - **Pitch Shifter & Speed**: Pitch shift (-12 to +12 semitones) and variable playback rate (0.5x to 2.0x).
-  - **Distortion / Overdrive**: Analog character options (Warm Overdrive, Lo-Fi Drums, Broken Speaker, Vintage Radio, Echo Chamber).
-  - **Stereo Pan & Master Output**: Left/Right balance control and master output volume.
-
-- **Preset Engine**:
-  - 14 built-in factory presets (Flat, Bass Booster, Bass Reducer, Vocal Booster, Treble Booster, Rock, Pop, Jazz, Electronic, Classical, Hip-Hop, Acoustic, Podcast, Club).
-  - Full custom preset creation, editing, and deletion with persistent storage via `UserDefaults`.
-  - Graphical mini-curve badges for each preset in the selector sheet.
-
-- **Audio File Importer & Built-in Demo Synthesizer**:
-  - Import any audio file directly from Files, iCloud Drive, or local storage (`MP3`, `M4A`, `WAV`, `AIFF`, `FLAC`, `AAC`).
-  - Integrated zero-file-needed PCM sound generator for immediate testing:
-    - *Harmonic Synth Pad* (lush multi-harmonic organ pad)
-    - *Pink Noise EQ Reference* (Paul Kellet's algorithm: 3dB/octave slope)
-    - *Rhythmic Beat Loop* (synthesized drum machine pattern)
-    - *Logarithmic Frequency Sweep* (30 Hz to 16 kHz sweep)
-  - Full transport controls: Scrub bar, elapsed & remaining time, Play/Pause, Stop, and Loop toggle.
+Unlike standard App Store audio players, Equalizer Pro leverages **unsandboxed entitlements** (`com.apple.private.security.no-sandbox`) and private system frameworks (`Celestial.framework`) to manipulate audio at the **system level**, modify **AirPods and headphone output across all apps**, and process **live hardware microphone input**.
 
 ---
 
-## 🏗 Audio Signal Processing Chain
+## ⚡ Core Capabilities for TrollStore & Jailbreak
+
+### 1. 🌐 System-Wide Equalizer (All Apps & System Audio)
+- **AirPods & Headphone System EQ via Apple Headphone Accommodations**:
+  - Automatically translates your 10-band fader curve into a native 7-band **Audiogram loss profile** and injects it into `/var/mobile/Library/Preferences/com.apple.HearingAids.plist`.
+  - Works **system-wide across all apps**: **Spotify, Apple Music, YouTube, Safari, Netflix, games, and phone calls**!
+  - Fully compatible with **AirPods 2, AirPods 3, AirPods Pro, AirPods Max**, and Beats headphones.
+  - No respring required — triggers instant daemon reload via Darwin notifications (`com.apple.HearingAids.SettingsChanged`).
+
+- **`mediaserverd` IPC Hook Integration (EQE / AudioServerPlugIn compatible)**:
+  - If a tweak or daemon is injected into `mediaserverd`, Equalizer Pro syncs in real-time via `/var/mobile/Library/Preferences/com.equalizer.systemeq.json` and UNIX domain socket (`/var/run/eqe.sock`).
+  - Includes privileged `posix_spawn` command to cleanly restart `mediaserverd` when needed.
+
+- **Bypass EU 85dB Headphone Volume Cap**:
+  - Dynamically interfaces with `AVSystemController` to lift hardware headphone safety limits, unlocking 100% full volume power.
+
+### 2. 🎙 Live Hardware Microphone & Voice DSP Processor
+- **Low-Latency Input-to-Output Pass-Through**:
+  - Captures device microphone or AirPods headset mic and streams processed audio directly to headphones with ultra-low buffer latency (~5.8ms).
+- **Noise Gate**:
+  - Intelligent RMS threshold muting to eliminate room background hum, PC fan noise, or hiss.
+- **Hardware Mic Gain / Preamp**:
+  - Boost weak microphone signals by up to +10 dB.
+- **Microphone 10-Band Parametric EQ**:
+  - Tailor voice presence, boost vocal warmth (250 Hz), add air/clarity (4 kHz - 8 kHz), and cut low-frequency rumble (high-pass at 32 Hz).
+- **Live Voice Pitch Shifter**:
+  - Shift voice pitch in real-time from -12 to +12 semitones (voice changer / pitch correction).
+
+### 3. 🎧 Studio Media Player & Audio Lab
+- Built-in `AVAudioEngine` player supporting imported audio files (`MP3`, `M4A`, `WAV`, `AIFF`, `FLAC`, `AAC`).
+- 4 built-in synthesized demo audio generators (*Harmonic Synth Pad*, *Pink Noise EQ Reference*, *Drum Beat Loop*, *Frequency Sweep*).
+- Real-time **vDSP FFT 20-band neon spectrum visualizer** with logarithmic frequency distribution.
+- DSP rack: **Reverb, Stereo Echo / Delay, Analog Distortion, and Stereo Panning**.
+
+---
+
+## 🎛 System Architecture & Signal Chain
 
 ```
-[Audio File / PCM Synth]
-          │
-          ▼
-  [AVAudioPlayerNode]
-          │
-          ▼
-   [AVAudioUnitEQ]  (10-Band Graphic Equalizer)
-          │
-          ▼
-[AVAudioUnitTimePitch] (Pitch Shifter & Speed)
-          │
-          ▼
-[AVAudioUnitDistortion] (Saturation & Overdrive)
-          │
-          ▼
-  [AVAudioUnitDelay] (Stereo Echo & Feedback)
-          │
-          ▼
- [AVAudioUnitReverb] (Room & Hall Ambience)
-          │
-          ▼
-   [Main Mixer Node] ──► [vDSP FFT Real-Time Tap] ──► [Spectrum Visualizer View]
-          │
-          ▼
-     [Output Node] (Headphones / Speakers / AirPlay)
+               ┌────────────────────────────────────────────────────────┐
+               │             Equalizer Pro (Unsandboxed)                │
+               │   com.apple.private.security.no-sandbox = true         │
+               └───────────────┬────────────────────────┬───────────────┘
+                               │                        │
+       [System Audio Hook / Audiogram]        [Live Hardware Mic DSP]
+                               │                        │
+               ┌───────────────▼──────────────┐         │
+               │  /var/mobile/Preferences/    │         ▼
+               │  com.apple.HearingAids.plist │  [AVAudioEngine]
+               │  com.equalizer.systemeq.json │  Mic In ──► HighPass ──► Mic EQ
+               └───────────────┬──────────────┘         ──► Pitch ──► Gate ──► Out
+                               │                        │
+               ┌───────────────▼──────────────┐         │
+               │   System Daemons & Audio     │         │
+               │   (heard / mediaserverd)     │         │
+               └───────────────┬──────────────┘         │
+                               │                        │
+               ┌───────────────▼────────────────────────▼──────────────┐
+               │         Hardware Output: AirPods / Headphones          │
+               │    System-Wide Frequency Response Altered in Real Time  │
+               └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 Project Directory Structure
+## 📁 Repository Structure
 
 ```
 ios-eq/
 ├── EqualizerApp.xcodeproj/
-│   ├── project.pbxproj                     # Standard Xcode project file
+│   ├── project.pbxproj                     # Xcode project configured for iOS 14.0+
 │   └── xcshareddata/xcschemes/
-│       └── EqualizerApp.xcscheme           # Xcode scheme (build, test, run)
+│       └── EqualizerApp.xcscheme           # Xcode build & test scheme
 ├── EqualizerApp/
 │   ├── App/
-│   │   ├── EqualizerApp.swift              # App entry point (@main)
-│   │   └── Info.plist                      # Background audio and app permissions
-│   ├── Models/
-│   │   ├── EQBand.swift                    # Frequency band data model
-│   │   ├── EQPreset.swift                  # Presets & factory configurations
-│   │   ├── AudioTrack.swift                # Track metadata & time helpers
-│   │   └── AudioEffectSettings.swift       # Reverb, Delay, Pitch, Distortion models
+│   │   ├── EqualizerApp.swift              # SwiftUI entry point
+│   │   ├── Info.plist                      # Background audio & mic permissions
+│   │   └── EqualizerApp.entitlements       # TrollStore unsandboxed entitlements
+│   ├── SystemAudio/                        # TrollStore & Jailbreak System Control
+│   │   ├── TrollStoreEnvironment.swift    # Privilege & jailbreak environment detector
+│   │   ├── SystemAudiogramManager.swift    # Headphone Accommodations & Audiogram injector
+│   │   ├── AVSystemControllerBridge.swift # Private Celestial.framework dynamic bridge
+│   │   └── MediaServerdIPC.swift           # IPC hook for mediaserverd & EQE
 │   ├── AudioEngine/
-│   │   ├── AudioEngineManager.swift        # AVAudioEngine graph & transport
-│   │   ├── FFTAnalyzer.swift               # Accelerate vDSP FFT processor
-│   │   └── AudioToneGenerator.swift        # Real-time PCM audio synthesizer
+│   │   ├── AudioEngineManager.swift        # Primary AVAudioEngine playback pipeline
+│   │   ├── LiveInputMonitorEngine.swift    # Low-latency Mic & Voice DSP engine
+│   │   ├── FFTAnalyzer.swift               # Accelerate vDSP FFT spectrum analyzer
+│   │   └── AudioToneGenerator.swift        # Built-in PCM demo synthesizer
 │   ├── ViewModels/
-│   │   └── EqualizerViewModel.swift        # ObservableObject state manager
+│   │   └── EqualizerViewModel.swift        # State manager for System, Mic & Player modes
 │   ├── Views/
-│   │   ├── MainView.swift                  # Studio root view
+│   │   ├── MainView.swift                  # Multi-mode studio UI (iOS 14 & 15 compatible)
 │   │   ├── DocumentPicker.swift            # iOS file importer
 │   │   └── Components/
-│   │       ├── SpectrumVisualizerView.swift# Neon real-time spectrum visualizer
-│   │       ├── VerticalSliderView.swift    # Tactile hardware slider fader
-│   │       ├── EqualizerBandsView.swift    # 10 faders + response curve view
-│   │       ├── PlayerControlBarView.swift  # Scrubber & transport buttons
-│   │       ├── PresetSelectorView.swift    # Preset browser & saver
-│   │       └── EffectsRackView.swift       # DSP studio rack
-│   ├── Storage/
-│   │   └── PresetStore.swift               # Custom preset persistence
-│   ├── Assets.xcassets/                    # Icons and accent color catalog
-│   └── Preview Content/                    # SwiftUI previews catalog
-├── EqualizerAppTests/
-│   └── EqualizerAppTests.swift             # Unit tests for bands, presets & synthesis
-├── Package.swift                           # Swift Package Manager manifest
-├── .gitignore                              # Standard iOS git exclusions
-└── README.md                               # Project documentation
+│   │       ├── SpectrumVisualizerView.swift# 20-band neon audio visualizer
+│   │       ├── VerticalSliderView.swift    # Tactile fader knobs with 0 dB snap
+│   │       ├── EqualizerBandsView.swift    # 10 faders + live spline curve
+│   │       ├── SystemAudioSheetView.swift  # System EQ & route settings sheet
+│   │       ├── MicControlBarView.swift     # Live mic & voice pitch control bar
+│   │       ├── PlayerControlBarView.swift  # Media scrubber & transport buttons
+│   │       ├── PresetSelectorView.swift    # Factory & custom presets sheet
+│   │       └── EffectsRackView.swift       # Reverb, Delay, Distortion & Pan DSP
+│   ├── Models/                             # EQBand, EQPreset, AudioTrack, Effects
+│   ├── Storage/PresetStore.swift           # Custom presets persistence
+│   └── Assets.xcassets/                    # Asset catalogs
+├── EqualizerAppTests/                      # Automated unit test suite
+├── build_trollstore.sh                     # Packaging script for .tipa (TrollStore)
+├── Package.swift                           # SwiftPM package manifest (.iOS(.v14))
+└── README.md
 ```
 
 ---
 
-## 🚀 How to Build and Run
+## 📦 Building & Installing on TrollStore (iOS 14.0 - 15.x)
 
-### Requirements
-- **macOS** 12.0 or later
-- **Xcode** 14.0 or later
-- **iOS Deployment Target**: iOS 15.0+ (supports iOS 15, 16, 17, and 18)
-- **Supported Devices**: iPhone & iPad
+### Option 1: Packaging as `.tipa` via script
+Run the included build script:
+```bash
+./build_trollstore.sh
+```
+This generates `output/EqualizerPro.tipa` signed with the unsandboxed entitlements. You can then:
+1. AirDrop or transfer `EqualizerPro.tipa` to your iOS device.
+2. Open with **TrollStore** to install.
 
-### Steps
-1. Clone or copy the `ios-eq` folder to your Mac.
-2. Double-click **`EqualizerApp.xcodeproj`** to open the project in Xcode.
-3. Select your target device or simulator (e.g. *iPhone 15 Pro* or *iPad Pro*).
-4. Press **`Cmd + R`** (or click the **Play** button) to build and run.
-5. Select a built-in demo sound (*Harmonic Synth Pad* is preloaded) or tap the folder icon to import your favorite MP3/WAV/FLAC track!
-
-### Running Unit Tests
-- Press **`Cmd + U`** in Xcode to run all automated unit tests in `EqualizerAppTests`.
-- Or run `swift test` from the terminal.
+### Option 2: Building with Xcode
+1. Open **`EqualizerApp.xcodeproj`** in Xcode.
+2. The deployment target is set to **iOS 14.0**.
+3. Select any connected device or simulator.
+4. Build and archive or export `.ipa`, then install via TrollStore.
