@@ -1,0 +1,65 @@
+name: Build iOS-EQ IPA
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً من موقع GitHub في أي وقت
+
+jobs:
+  build:
+    runs-on: macos-latest # ضروري لأن أدوات Xcode تعمل فقط على نظام ماك
+
+    steps:
+      - name: سحب ملفات المشروع (Checkout)
+        uses: actions/checkout@v4
+
+      - name: الكشف عن إعدادات المشروع وبناء التطبيق
+        run: |
+          # البحث التلقائي عن ملف المشروع أو مساحة العمل
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | jq -r '.workspace.schemes[0]')
+            echo "Building Workspace: $WORKSPACE with Scheme: $SCHEME"
+            xcodebuild clean build \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath DerivedData \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
+          elif ls *.xcodeproj 1> /dev/null 2>&1; then
+            PROJECT=$(ls -d *.xcodeproj | head -n 1)
+            SCHEME=$(xcodebuild -project "$PROJECT" -list -json | jq -r '.project.schemes[0]')
+            echo "Building Project: $PROJECT with Scheme: $SCHEME"
+            xcodebuild clean build \
+              -project "$PROJECT" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath DerivedData \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
+          else
+            echo "لم يتم العثور على ملف .xcodeproj أو .xcworkspace في المجلد الرئيسي!"
+            exit 1
+          fi
+
+      - name: تحويل التطبيق إلى ملف IPA
+        run: |
+          mkdir -p Payload
+          APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "فشل العثور على ملف .app الناتج!"
+            exit 1
+          fi
+          cp -r "$APP_PATH" Payload/
+          zip -r -q iOS-EQ.ipa Payload
+
+      - name: رفع ملف الـ IPA لتحميله
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-EQ-IPA
+          path: iOS-EQ.ipa
