@@ -1,19 +1,18 @@
-name: Build iOS-EQ IPA
+name: Build iOS-EQ IPA (TrollStore)
 
 on:
-  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً من موقع GitHub في أي وقت
+  workflow_dispatch: # يعمل يدوياً فقط من تبويب Actions في موقع GitHub
 
 jobs:
   build:
-    runs-on: macos-latest # ضروري لأن أدوات Xcode تعمل فقط على نظام ماك
+    runs-on: macos-latest
 
     steps:
       - name: سحب ملفات المشروع (Checkout)
         uses: actions/checkout@v4
 
-      - name: الكشف عن إعدادات المشروع وبناء التطبيق
+      - name: بناء التطبيق عبر Xcode (بدون توقيع أبل التقليدي)
         run: |
-          # البحث التلقائي عن ملف المشروع أو مساحة العمل
           if ls *.xcworkspace 1> /dev/null 2>&1; then
             WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
             SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | jq -r '.workspace.schemes[0]')
@@ -41,23 +40,85 @@ jobs:
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGNING_ALLOWED=NO
           else
-            echo "لم يتم العثور على ملف .xcodeproj أو .xcworkspace في المجلد الرئيسي!"
+            echo "لم يتم العثور على ملف .xcodeproj أو .xcworkspace!"
             exit 1
           fi
 
-      - name: تحويل التطبيق إلى ملف IPA
+      - name: توقيع التطبيق بصلاحيات TrollStore عبر ldid وإنشاء IPA
         run: |
+          # تثبيت أداة ldid الخاصة بتوقيع تطبيقات TrollStore
+          brew install ldid
+
           mkdir -p Payload
           APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "فشل العثور على ملف .app الناتج!"
             exit 1
           fi
+
           cp -r "$APP_PATH" Payload/
+          APP_NAME=$(basename "$APP_PATH")
+          BINARY_NAME=$(basename "$APP_PATH" .app)
+          APP_BINARY="Payload/$APP_NAME/$BINARY_NAME"
+
+          # إزالة أي توقيع مبدئي فارغ قبل حقن الصلاحيات
+          codesign --remove-signature "$APP_BINARY" || true
+
+          # البحث عن ملف الصلاحيات (.entitlements) في المشروع
+          ENTITLEMENTS_FILE=$(find . -name "*.entitlements" | head -n 1)
+
+          if [ -n "$ENTITLEMENTS_FILE" ]; then
+            echo "✅ تم العثور على ملف الصلاحيات: $ENTITLEMENTS_FILE"
+            ldid -S"$ENTITLEMENTS_FILE" "$APP_BINARY"
+          else
+            echo "⚠️ لم يتم العثور على ملف .entitlements في المشروع! سيتم إنشاء ملف صلاحيات TrollStore شامل وتوقيع التطبيق به..."
+            cat << 'EOF' > fallback_entitlements.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>platform-application</key>
+              <true/>
+              <key>com.apple.private.security.no-sandbox</key>
+              <true/>
+              <key>com.apple.private.persona-mgmt</key>
+              <true/>
+              <key>com.apple.private.security.storage.AppDataContainers</key>
+              <true/>
+              <key>get-task-allow</key>
+              <true/>
+              <key>com.apple.security.exception.mach-lookup.global-name</key>
+              <array>
+                  <string>com.apple.mediaserverd</string>
+                  <string>com.apple.audio.AudioSession</string>
+                  <string>com.apple.accessibility.heard</string>
+                  <string>com.apple.cfprefsd.daemon</string>
+                  <string>com.apple.cfprefsd.agent</string>
+                  <string>com.apple.frontboard.systemappservices</string>
+              </array>
+              <key>com.apple.security.exception.shared-preference.read-write</key>
+              <array>
+                  <string>com.apple.Accessibility</string>
+                  <string>com.apple.HearingAids</string>
+                  <string>com.apple.celestial</string>
+                  <string>com.apple.coreaudio</string>
+                  <string>com.apple.springboard</string>
+              </array>
+          </dict>
+          </plist>
+          EOF
+            ldid -Sfallback_entitlements.plist "$APP_BINARY"
+          fi
+
+          # التحقق من نجاح حقن الصلاحيات وطباعتها في سجل GitHub Actions
+          echo "--- الصلاحيات المحقونة داخل التطبيق (Entitlements) ---"
+          ldid -e "$APP_BINARY"
+
+          # ضغط المجلد في ملف IPA جاهز للتثبيت عبر TrollStore
           zip -r -q iOS-EQ.ipa Payload
 
-      - name: رفع ملف الـ IPA لتحميله
+      - name: رفع ملف الـ IPA النهائي
         uses: actions/upload-artifact@v4
         with:
-          name: iOS-EQ-IPA
+          name: iOS-EQ-TrollStore-IPA
           path: iOS-EQ.ipa
