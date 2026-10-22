@@ -15,7 +15,7 @@ public final class PresetStore {
             return []
         }
         do {
-            let presets = try JSONDecoder().decode([EQPreset].self, data)
+            let presets = try JSONDecoder().decode([EQPreset].self, from: data)
             return presets
         } catch {
             print("[PresetStore] Error decoding presets: \(error.localizedDescription)")

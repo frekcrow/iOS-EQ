@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # TrollStore / Jailbreak .tipa Packaging Script for Equalizer Pro
-# Targets: iOS 14.0 - 15.x (iPhone & iPad)
+# Targets: iOS 15.x+ (iPhone & iPad)
 # ==============================================================================
 
 set -e
@@ -11,7 +11,7 @@ BUILD_DIR="build"
 OUTPUT_DIR="output"
 ENTITLEMENTS="EqualizerApp/App/EqualizerApp.entitlements"
 
-echo "=== Packaging Equalizer Pro for TrollStore (iOS 14.0 - 15.x) ==="
+echo "=== Packaging Equalizer Pro for TrollStore (iOS 15.x+) ==="
 
 # Clean previous build artifacts
 rm -rf "$OUTPUT_DIR"
@@ -25,7 +25,7 @@ elif [ -d "$BUILD_DIR/$APP_NAME.app" ]; then
     echo "[+] Found build at $BUILD_DIR/$APP_NAME.app"
     cp -r "$BUILD_DIR/$APP_NAME.app" "$OUTPUT_DIR/Payload/"
 else
-    echo "[!] Compiling with xcodebuild (Target: iOS 14.0, Release)..."
+    echo "[!] Compiling with xcodebuild (Target: iOS 15.0, Release)..."
     if command -v xcodebuild &> /dev/null; then
         xcodebuild -project "$APP_NAME.xcodeproj" \
                    -scheme "$APP_NAME" \
@@ -34,7 +34,7 @@ else
                    -sdk iphoneos \
                    CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos" \
                    CODE_SIGNING_ALLOWED=NO \
-                   IPHONEOS_DEPLOYMENT_TARGET=14.0 \
+                   IPHONEOS_DEPLOYMENT_TARGET=15.0 \
                    build
         cp -r "$BUILD_DIR/Release-iphoneos/$APP_NAME.app" "$OUTPUT_DIR/Payload/"
     else

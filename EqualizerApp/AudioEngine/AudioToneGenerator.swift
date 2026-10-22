@@ -144,7 +144,6 @@ public final class AudioToneGenerator {
         let bpm = 120.0
         let secondsPerBeat = 60.0 / bpm
         let samplesPerBeat = Int(secondsPerBeat * sampleRate)
-        let totalBeats = count / samplesPerBeat
         
         for frame in 0..<count {
             let beatIndex = frame / samplesPerBeat
@@ -204,8 +203,6 @@ public final class AudioToneGenerator {
         for frame in 0..<count {
             let t = Double(frame) / sampleRate
             let normalizedTime = t / duration
-            // Logarithmic sweep: f(t) = f0 * (f1/f0)^(t/T)
-            let currentFreq = f0 * pow(f1 / f0, normalizedTime)
             let phase = 2.0 * .pi * f0 * (pow(f1 / f0, normalizedTime) - 1.0) / log(f1 / f0) * duration
             
             let sample = Float(sin(phase)) * 0.4

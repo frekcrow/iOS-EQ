@@ -102,7 +102,7 @@ public final class TrollStoreEnvironment {
             posix_spawn_file_actions_destroy(&fileActions)
         }
         
-        var env: [UnsafeMutablePointer<CChar>?] = [
+        let env: [UnsafeMutablePointer<CChar>?] = [
             strdup("PATH=/var/jb/usr/bin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin"),
             nil
         ]

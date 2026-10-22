@@ -70,8 +70,13 @@ public final class FFTAnalyzer {
         
         // 3. Compute magnitudes: sqrt(real^2 + imag^2)
         var magnitudes = [Float](repeating: 0.0, count: halfSize)
-        var splitComplex = DSPSplitComplex(realp: &realOut, imagp: &imagOut)
-        vDSP_zvabs(&splitComplex, 1, &magnitudes, 1, vDSP_Length(halfSize))
+        realOut.withUnsafeMutableBufferPointer { realPtr in
+            imagOut.withUnsafeMutableBufferPointer { imagPtr in
+                guard let rBase = realPtr.baseAddress, let iBase = imagPtr.baseAddress else { return }
+                var splitComplex = DSPSplitComplex(realp: rBase, imagp: iBase)
+                vDSP_zvabs(&splitComplex, 1, &magnitudes, 1, vDSP_Length(halfSize))
+            }
+        }
         
         // 4. Group bins into logarithmic frequency bands
         let bandMagnitudes = computeLogarithmicBands(magnitudes: magnitudes, sampleRate: Float(buffer.format.sampleRate))

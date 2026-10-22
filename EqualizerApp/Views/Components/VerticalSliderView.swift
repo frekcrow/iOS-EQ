@@ -68,7 +68,7 @@ public struct VerticalSliderView: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(
                             band.bypass
-                                ? Color.gray.opacity(0.3)
+                                ? LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .bottom, endPoint: .top)
                                 : (band.gain >= 0
                                    ? LinearGradient(colors: [Color.cyan, Color.blue], startPoint: .top, endPoint: .bottom)
                                    : LinearGradient(colors: [Color.orange, Color.red], startPoint: .bottom, endPoint: .top))

@@ -76,7 +76,7 @@ final class EqualizerAppTests: XCTestCase {
         )
         
         let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(EQPreset.self, data)
+        let decoded = try JSONDecoder().decode(EQPreset.self, from: data)
         
         XCTAssertEqual(original.name, decoded.name)
         XCTAssertEqual(original.gains, decoded.gains)

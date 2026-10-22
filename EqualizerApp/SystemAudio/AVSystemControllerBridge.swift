@@ -18,7 +18,7 @@ public final class AVSystemControllerBridge: NSObject {
     
     private func loadCelestialFramework() {
         let frameworkPath = "/System/Library/PrivateFrameworks/Celestial.framework/Celestial"
-        guard let handle = dlopen(frameworkPath, RTLD_NOW) else {
+        guard dlopen(frameworkPath, RTLD_NOW) != nil else {
             print("[AVSystemControllerBridge] Unable to dlopen Celestial framework")
             return
         }
