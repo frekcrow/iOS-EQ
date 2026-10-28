@@ -2,8 +2,8 @@ import Foundation
 import CoreFoundation
 
 /// Controls system-wide Headphone Accommodations and Audiogram EQ curves on iOS 14.0 - 15.x.
-/// Applies frequency curves system-wide across all apps (Spotify, Apple Music, YouTube, Phone Calls)
-/// for AirPods, EarPods, and supported headphones using CFPreferences and unsandboxed TrollStore/jailbreak access.
+/// Exclusively targets Wired Headphones (3.5mm Aux, Lightning headphones/dongles, USB-C headphones, external USB DACs)
+/// using CFPreferences, disk plist writes, and unsandboxed TrollStore/jailbreak access.
 public final class SystemAudiogramManager {
     public static let shared = SystemAudiogramManager()
     
@@ -12,6 +12,10 @@ public final class SystemAudiogramManager {
     
     private let preferencesPath = "/var/mobile/Library/Preferences/com.apple.HearingAids.plist"
     private let accessibilityPath = "/var/mobile/Library/Preferences/com.apple.Accessibility.plist"
+    
+    // Target route category exclusively locked to wired output
+    public static let targetRouteName = "Headphones"
+    public static let targetRouteCategory = "Wired"
     
     // Standard audiogram frequency test points supported natively by iOS 14/15
     public static let audiogramFrequencies: [Float] = [125, 250, 500, 1000, 2000, 4000, 8000]
@@ -79,15 +83,15 @@ public final class SystemAudiogramManager {
         CFPreferencesSetValue(cfKey, cfValue, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
         CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
         
-        // 2. Also write explicitly for "mobile" user (daemons like heard read from mobile)
+        // 2. Also write explicitly for "mobile" user (daemons like heard & mediaserverd read from mobile)
         let mobileUser = "mobile" as CFString
         CFPreferencesSetValue(cfKey, cfValue, domain, mobileUser, kCFPreferencesAnyHost)
         CFPreferencesSynchronize(domain, mobileUser, kCFPreferencesAnyHost)
     }
     
-    // MARK: - Apply System Audiogram EQ
+    // MARK: - Apply System Audiogram EQ for Wired Headphones
     
-    /// Converts a 10-band EQ curve into an Apple 7-band Audiogram profile and injects it system-wide.
+    /// Converts a 10-band EQ curve into an Apple 7-band Audiogram profile targeting Wired Headphones exclusively.
     @discardableResult
     public func applyCustomAudiogramEQ(bandGains: [Float], restartDaemons: Bool = false) -> Bool {
         // Map 10-band fader gains to 7 standard audiogram test frequencies:
@@ -124,18 +128,26 @@ public final class SystemAudiogramManager {
             "LeftEarLoss": lossValues,
             "RightEarLoss": lossValues,
             "DateCreated": Date().timeIntervalSince1970,
-            "ProfileName": "Equalizer Pro System Profile"
+            "ProfileName": "Equalizer Pro Wired Headphone Profile",
+            "TargetRoute": Self.targetRouteName,
+            "RouteCategory": Self.targetRouteCategory,
+            "DeviceType": "Headphones"
         ]
         
-        // 1. Write via CFPreferences (targeting both current user and 'mobile')
+        // 1. Write via CFPreferences (targeting both current user and 'mobile' for cfprefsd caching)
         setPreference(key: "HearingAidsAccommodationsEnabled", value: true, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsAccommodationsAppliesToPhone", value: true, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsAccommodationsAppliesToMedia", value: true, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsAccommodationsTuning", value: TuningType.customAudiogram.rawValue, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsRouteTarget", value: Self.targetRouteName, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsDevice", value: Self.targetRouteName, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAvailableDevices", value: [Self.targetRouteName, Self.targetRouteCategory], domain: hearingAidsDomain)
         setPreference(key: "HearingAidsCustomAudiogram", value: audiogramDict, domain: hearingAidsDomain)
         
-        // Also mirror in Accessibility domain
+        // Also mirror in Accessibility domain targeting headphones specifically
         setPreference(key: "AXHeadphoneAccommodationsEnabled", value: true, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsRoute", value: Self.targetRouteName, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsDevice", value: Self.targetRouteName, domain: accessibilityDomain)
         setPreference(key: "AXHeadphoneAccommodationsCustomAudiogram", value: audiogramDict, domain: accessibilityDomain)
         
         // 2. Write direct to disk plists as backup
@@ -144,11 +156,16 @@ public final class SystemAudiogramManager {
         hearingDict["HearingAidsAccommodationsAppliesToPhone"] = true
         hearingDict["HearingAidsAccommodationsAppliesToMedia"] = true
         hearingDict["HearingAidsAccommodationsTuning"] = TuningType.customAudiogram.rawValue
+        hearingDict["HearingAidsAccommodationsRouteTarget"] = Self.targetRouteName
+        hearingDict["HearingAidsAccommodationsDevice"] = Self.targetRouteName
+        hearingDict["HearingAidsAccommodationsAvailableDevices"] = [Self.targetRouteName, Self.targetRouteCategory]
         hearingDict["HearingAidsCustomAudiogram"] = audiogramDict
         (hearingDict as NSDictionary).write(toFile: preferencesPath, atomically: true)
         
         var accessDict = (NSDictionary(contentsOfFile: accessibilityPath) as? [String: Any]) ?? [:]
         accessDict["AXHeadphoneAccommodationsEnabled"] = true
+        accessDict["AXHeadphoneAccommodationsRoute"] = Self.targetRouteName
+        accessDict["AXHeadphoneAccommodationsDevice"] = Self.targetRouteName
         accessDict["AXHeadphoneAccommodationsCustomAudiogram"] = audiogramDict
         (accessDict as NSDictionary).write(toFile: accessibilityPath, atomically: true)
         
@@ -161,6 +178,12 @@ public final class SystemAudiogramManager {
         }
         
         return true
+    }
+    
+    /// Convenient helper to apply the EQ exclusively to wired output and restart system daemons.
+    @discardableResult
+    public func applyToWiredOutputAndRestart(bandGains: [Float]) -> Bool {
+        return applyCustomAudiogramEQ(bandGains: bandGains, restartDaemons: true)
     }
     
     // MARK: - Enable / Disable Accommodations
@@ -184,19 +207,24 @@ public final class SystemAudiogramManager {
         return true
     }
     
-    // MARK: - Reset to Stock Default
+    // MARK: - Reset Wired EQ to Stock Default
     
-    /// Resets all system audio accommodations and audiograms back to default un-equalized iOS state.
+    /// Resets all system headphone audio accommodations and audiograms back to default un-equalized iOS state.
     @discardableResult
-    public func resetToDefaultSystemAudio() -> Bool {
+    public func resetWiredEQToStock() -> Bool {
         // Clear HearingAids preferences
         setPreference(key: "HearingAidsAccommodationsEnabled", value: false, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsCustomAudiogram", value: nil, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsAccommodationsTuning", value: nil, domain: hearingAidsDomain)
         setPreference(key: "HearingAidsAccommodationsStrength", value: nil, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsRouteTarget", value: nil, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsDevice", value: nil, domain: hearingAidsDomain)
+        setPreference(key: "HearingAidsAccommodationsAvailableDevices", value: nil, domain: hearingAidsDomain)
         
         // Clear Accessibility preferences
         setPreference(key: "AXHeadphoneAccommodationsEnabled", value: false, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsRoute", value: nil, domain: accessibilityDomain)
+        setPreference(key: "AXHeadphoneAccommodationsDevice", value: nil, domain: accessibilityDomain)
         setPreference(key: "AXHeadphoneAccommodationsCustomAudiogram", value: nil, domain: accessibilityDomain)
         
         // Clear disk plists
@@ -205,11 +233,16 @@ public final class SystemAudiogramManager {
             hearingDict.removeValue(forKey: "HearingAidsCustomAudiogram")
             hearingDict.removeValue(forKey: "HearingAidsAccommodationsTuning")
             hearingDict.removeValue(forKey: "HearingAidsAccommodationsStrength")
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsRouteTarget")
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsDevice")
+            hearingDict.removeValue(forKey: "HearingAidsAccommodationsAvailableDevices")
             (hearingDict as NSDictionary).write(toFile: preferencesPath, atomically: true)
         }
         
         if var accessDict = NSDictionary(contentsOfFile: accessibilityPath) as? [String: Any] {
             accessDict.removeValue(forKey: "AXHeadphoneAccommodationsEnabled")
+            accessDict.removeValue(forKey: "AXHeadphoneAccommodationsRoute")
+            accessDict.removeValue(forKey: "AXHeadphoneAccommodationsDevice")
             accessDict.removeValue(forKey: "AXHeadphoneAccommodationsCustomAudiogram")
             (accessDict as NSDictionary).write(toFile: accessibilityPath, atomically: true)
         }
@@ -227,6 +260,17 @@ public final class SystemAudiogramManager {
         // Restart daemons so stock sound is restored immediately
         TrollStoreEnvironment.shared.restartAudioEngine()
         return true
+    }
+    
+    /// Alias for backwards compatibility with tests
+    @discardableResult
+    public func resetToDefaultSystemAudio() -> Bool {
+        return resetWiredEQToStock()
+    }
+    
+    // MARK: - Respring
+    public func respring() {
+        TrollStoreEnvironment.shared.respring()
     }
     
     /// Broadcasts Darwin notifications to trigger immediate system daemon reload.

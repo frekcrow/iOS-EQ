@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Sheet providing system-level audio controls, TrollStore status,
-/// Headphone Accommodations Audiogram injection, and daemon management.
+/// Headphone Accommodations Audiogram injection for wired headphones, and daemon management.
 public struct SystemAudioSheetView: View {
     @ObservedObject var viewModel: EqualizerViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -20,10 +20,10 @@ public struct SystemAudioSheetView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
-                        // Environment & Active Route Card
+                        // Environment & Wired Route Card
                         environmentCard
                         
-                        // System-Wide EQ (Headphone Accommodations)
+                        // System-Wide EQ for Wired Headphones
                         systemEQCard
                         
                         // Daemon & Respring Management Card
@@ -36,7 +36,7 @@ public struct SystemAudioSheetView: View {
                     .padding(.vertical, 16)
                 }
             }
-            .navigationTitle("System Audio Control")
+            .navigationTitle("Wired Headphone System EQ")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -49,10 +49,10 @@ public struct SystemAudioSheetView: View {
             // Reset Confirmation Alert
             .alert(isPresented: $showingResetAlert) {
                 Alert(
-                    title: Text("Reset System Audio?"),
-                    message: Text("This will remove all custom audiograms, turn off Headphone Accommodations, restore stock iOS audio settings, and restart audio daemons."),
+                    title: Text("Reset Wired Headphone EQ?"),
+                    message: Text("This will remove custom audiograms, turn off Headphone Accommodations for wired outputs, restore stock iOS audio settings, and restart audio daemons."),
                     primaryButton: .destructive(Text("Reset to Default")) {
-                        viewModel.resetSystemAudioToDefault()
+                        viewModel.resetWiredEQToStock()
                     },
                     secondaryButton: .cancel()
                 )
@@ -60,13 +60,13 @@ public struct SystemAudioSheetView: View {
         }
     }
     
-    // MARK: - Environment Card
+    // MARK: - Environment & Wired Route Card
     private var environmentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: "cpu")
                     .foregroundColor(.cyan)
-                Text("ENVIRONMENT & HARDWARE ROUTE")
+                Text("WIRED HARDWARE ROUTE & ENVIRONMENT")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -81,6 +81,7 @@ public struct SystemAudioSheetView: View {
                 }
             }
             
+            // Access Level
             HStack {
                 Text("Access Level:")
                     .font(.system(size: 13))
@@ -96,18 +97,48 @@ public struct SystemAudioSheetView: View {
                     )
             }
             
+            // Wired Status
             HStack {
-                Text("Active Route:")
+                Text("Wired Connection:")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                 Spacer()
                 HStack(spacing: 4) {
-                    Image(systemName: "airpodspro")
+                    Circle()
+                        .fill(viewModel.isWiredHeadsetConnected ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(viewModel.isWiredHeadsetConnected ? "CONNECTED" : "NOT DETECTED")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(viewModel.isWiredHeadsetConnected ? .green : .orange)
+                }
+            }
+            
+            // Detected Port
+            HStack {
+                Text("Detected Port:")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
                         .font(.system(size: 12))
-                    Text(viewModel.activeAudioRoute)
+                    Text(viewModel.connectedPortName)
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundColor(.cyan)
+            }
+            
+            // Hardware Format
+            if viewModel.isWiredHeadsetConnected {
+                HStack {
+                    Text("Hardware Format:")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(viewModel.hardwareFormatText)
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .padding(14)
@@ -121,13 +152,13 @@ public struct SystemAudioSheetView: View {
         )
     }
     
-    // MARK: - System-Wide EQ Card
+    // MARK: - Wired System-Wide EQ Card
     private var systemEQCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "headphones")
                     .foregroundColor(.purple)
-                Text("SYSTEM-WIDE EQUALIZER (AIRPODS / HEADPHONES)")
+                Text("WIRED SYSTEM-WIDE EQUALIZER (3.5MM / LIGHTNING / USB-C)")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -138,34 +169,36 @@ public struct SystemAudioSheetView: View {
                     .toggleStyle(SwitchToggleStyle(tint: .purple))
                     .onChange(of: viewModel.isSystemEQActive) { active in
                         if active {
-                            viewModel.applySystemWideEQ(restartDaemons: true)
+                            viewModel.applyToWiredOutput(restartDaemons: true)
                         } else {
                             viewModel.disableSystemWideEQ()
                         }
                     }
             }
             
-            Text("Applies your custom 10-band curve globally to Spotify, Apple Music, YouTube, Safari, games, and phone calls using CFPreferences and Apple's Headphone Accommodations.")
+            Text("Injects your custom 10-band EQ curve strictly into Apple's Headphone Accommodations & Audiogram daemon (heard) for wired outputs (3.5mm Aux, Lightning, USB-C headphones & external USB DACs). Zero leakage to built-in speaker.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             
-            // Push & Apply Button
+            // Apply to Wired Output (Restart Audio) Button
             Button(action: {
-                viewModel.applySystemWideEQ(restartDaemons: true)
+                viewModel.applyToWiredOutput(restartDaemons: true)
             }) {
-                HStack {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                    Text("Apply EQ & Restart Audio Engine")
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 14))
+                    Text("Apply to Wired Output (Restart Audio)")
                         .font(.system(size: 13, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
+                .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
                         .fill(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))
                 )
                 .foregroundColor(.white)
+                .shadow(color: Color.purple.opacity(0.3), radius: 5)
             }
             
             if !viewModel.systemStatusMessage.isEmpty {
@@ -197,12 +230,12 @@ public struct SystemAudioSheetView: View {
                     .foregroundColor(.white)
             }
             
-            Text("In TrollStore tweaks, restarting mediaserverd & heard forces the audio system to reload CFPreferences without rebooting.")
+            Text("Forces mediaserverd & heard to reload CFPreferences without rebooting your iOS device.")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
             
             HStack(spacing: 12) {
-                // Restart Audio Button
+                // Restart Audio Daemons Button
                 Button(action: {
                     viewModel.restartAudioEngine()
                 }) {
@@ -246,7 +279,7 @@ public struct SystemAudioSheetView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise.circle.fill")
                         .font(.system(size: 14))
-                    Text("Reset System Audio to Stock Default")
+                    Text("Reset Wired EQ to Stock Default")
                         .font(.system(size: 12, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
@@ -281,10 +314,10 @@ public struct SystemAudioSheetView: View {
             // Bypass EU Headphone Volume Limit
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Disable EU 85dB Volume Cap")
+                    Text("Disable EU 85dB Wired Headphone Cap")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
-                    Text("Unlocks 100% volume output on headphones")
+                    Text("Unlocks 100% volume output on 3.5mm/Lightning/USB-C")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }

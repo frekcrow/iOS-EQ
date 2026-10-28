@@ -51,10 +51,11 @@ public final class AudioEngineManager: NSObject {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
+            // Exclusively wired headphones: strictly no Bluetooth, no AirPlay, no defaultToSpeaker
             try session.setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowAirPlay, .allowBluetoothA2DP, .allowBluetoothHFP, .mixWithOthers]
+                options: [.mixWithOthers]
             )
             try session.setActive(true)
             
@@ -97,11 +98,14 @@ public final class AudioEngineManager: NSObject {
     }
     
     @objc private func handleRouteChange(notification: Notification) {
+        WiredHeadphoneMonitor.shared.refresh()
+        
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
         
-        if reason == .oldDeviceUnavailable {
+        // Immediately pause if headphones were unplugged to prevent speaker blast
+        if reason == .oldDeviceUnavailable || !WiredHeadphoneMonitor.shared.isWiredHeadsetConnected {
             pause()
         }
     }

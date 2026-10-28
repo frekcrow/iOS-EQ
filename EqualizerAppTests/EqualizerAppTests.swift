@@ -113,15 +113,53 @@ final class EqualizerAppTests: XCTestCase {
         XCTAssertEqual(freqs, [125, 250, 500, 1000, 2000, 4000, 8000])
     }
 
+    func testWiredAudiogramTarget() {
+        XCTAssertEqual(SystemAudiogramManager.targetRouteName, "Headphones")
+        XCTAssertEqual(SystemAudiogramManager.targetRouteCategory, "Wired")
+    }
+
     // MARK: - TrollStore Environment Tests
     func testTrollStoreEnvironmentDetection() {
         let env = TrollStoreEnvironment.shared
         XCTAssertNotNil(env.environment)
     }
 
-    func testResetSystemAudio() {
-        let success = SystemAudiogramManager.shared.resetToDefaultSystemAudio()
+    func testResetWiredEQToStock() {
+        let success = SystemAudiogramManager.shared.resetWiredEQToStock()
         XCTAssertTrue(success)
         XCTAssertFalse(SystemAudiogramManager.shared.isHeadphoneAccommodationsEnabled())
+    }
+
+    // MARK: - WiredHeadphoneMonitor Tests
+    func testWiredHeadphoneMonitorSimulation() {
+        let monitor = WiredHeadphoneMonitor.shared
+        
+        // Test simulation of USB-C Audio DAC
+        monitor.simulateWiredConnection(
+            isConnected: true,
+            portName: "Apple USB-C Audio Dongle",
+            portType: "USB-C Digital / DAC",
+            sampleRate: 48000.0,
+            channels: 2
+        )
+        
+        XCTAssertTrue(monitor.isWiredHeadsetConnected)
+        XCTAssertEqual(monitor.connectedPortName, "Apple USB-C Audio Dongle")
+        XCTAssertEqual(monitor.portTypeDescription, "USB-C Digital / DAC")
+        XCTAssertEqual(monitor.sampleRate, 48000.0)
+        XCTAssertEqual(monitor.channelCount, 2)
+        XCTAssertTrue(monitor.hardwareFormatDescription.contains("48.0 kHz"))
+        
+        // Test disconnection simulation
+        monitor.simulateWiredConnection(
+            isConnected: false,
+            portName: "No Wired Headphones",
+            portType: "Disconnected"
+        )
+        
+        XCTAssertFalse(monitor.isWiredHeadsetConnected)
+        XCTAssertEqual(monitor.connectedPortName, "No Wired Headphones")
+        
+        monitor.resetSimulation()
     }
 }

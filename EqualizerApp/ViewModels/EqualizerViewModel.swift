@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Operational Mode of Equalizer Pro.
 public enum AppAudioMode: String, CaseIterable, Identifiable {
-    case systemWide = "System Audio"
-    case microphoneDSP = "Mic / Voice"
+    case systemWide = "Wired System EQ"
+    case microphoneDSP = "Wired Mic / Voice"
     case mediaPlayer = "Studio Player"
     
     public var id: String { rawValue }
@@ -19,7 +19,7 @@ public enum AppAudioMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Main ViewModel coordinating Equalizer audio processing, system-wide Audiograms,
+/// Main ViewModel coordinating Equalizer audio processing, system-wide Audiograms for Wired Headphones,
 /// live microphone hardware monitoring, and media playback on iOS 14.0-15.x.
 public final class EqualizerViewModel: ObservableObject {
     
@@ -29,7 +29,15 @@ public final class EqualizerViewModel: ObservableObject {
     // MARK: - Jailbreak & Environment Status
     @Published public var environmentName: String = ""
     @Published public var isUnsandboxed: Bool = false
-    @Published public var activeAudioRoute: String = "Built-in Speaker / AirPods"
+    @Published public var activeAudioRoute: String = "No Wired Headphones"
+    
+    // MARK: - Wired Headphone Monitor Properties
+    @Published public var isWiredHeadsetConnected: Bool = false
+    @Published public var connectedPortName: String = "No Wired Headphones"
+    @Published public var portTypeDescription: String = "Disconnected"
+    @Published public var wiredSampleRate: Double = 44100.0
+    @Published public var wiredChannelCount: Int = 2
+    @Published public var hardwareFormatText: String = "-- kHz • --"
     
     // MARK: - System-Wide Headphone Accommodations & Audiogram
     @Published public var isSystemEQActive: Bool = false
@@ -72,19 +80,23 @@ public final class EqualizerViewModel: ObservableObject {
     // MARK: - Engines & Managers
     private let audioEngine: AudioEngineManager
     private let micEngine: LiveInputMonitorEngine
+    private let wiredMonitor: WiredHeadphoneMonitor
     private let presetStore: PresetStore
     private let audiogramManager: SystemAudiogramManager
     private let systemController: AVSystemControllerBridge
     private let trollStoreEnv: TrollStoreEnvironment
     private let mediaServerdIPC: MediaServerdIPC
+    private var cancellables = Set<AnyCancellable>()
     
     public init(
         audioEngine: AudioEngineManager = AudioEngineManager(),
         micEngine: LiveInputMonitorEngine = LiveInputMonitorEngine(),
+        wiredMonitor: WiredHeadphoneMonitor = WiredHeadphoneMonitor.shared,
         presetStore: PresetStore = PresetStore()
     ) {
         self.audioEngine = audioEngine
         self.micEngine = micEngine
+        self.wiredMonitor = wiredMonitor
         self.presetStore = presetStore
         self.audiogramManager = SystemAudiogramManager.shared
         self.systemController = AVSystemControllerBridge.shared
@@ -98,24 +110,76 @@ public final class EqualizerViewModel: ObservableObject {
         self.currentTrack = .placeholder
         
         setupEngineCallbacks()
+        setupWiredMonitorSubscriptions()
         refreshSystemStatus()
         loadInitialDemoAudio()
+    }
+    
+    // MARK: - Wired Headphone Subscriptions
+    private func setupWiredMonitorSubscriptions() {
+        wiredMonitor.$isWiredHeadsetConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] connected in
+                guard let self = self else { return }
+                self.isWiredHeadsetConnected = connected
+                if !connected {
+                    if self.isPlaying {
+                        self.pause()
+                        self.systemStatusMessage = "Wired headphones disconnected. Playback paused."
+                    }
+                    if self.isMicMonitoring {
+                        self.micEngine.stopMonitoring()
+                        self.isMicMonitoring = false
+                        self.systemStatusMessage = "Wired headphones disconnected. Mic monitor stopped."
+                    }
+                }
+            }
+            .store(in: &cancellables)
+        
+        wiredMonitor.$connectedPortName
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$connectedPortName)
+        
+        wiredMonitor.$portTypeDescription
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$portTypeDescription)
+        
+        wiredMonitor.$sampleRate
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$wiredSampleRate)
+        
+        wiredMonitor.$channelCount
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$wiredChannelCount)
+        
+        wiredMonitor.$hardwareFormatDescription
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$hardwareFormatText)
     }
     
     // MARK: - System Audio Status Refresh
     public func refreshSystemStatus() {
         trollStoreEnv.refresh()
+        wiredMonitor.refresh()
         self.environmentName = trollStoreEnv.environment.rawValue
         self.isUnsandboxed = trollStoreEnv.isUnsandboxed
-        self.activeAudioRoute = systemController.getActiveAudioRoute()
+        self.isWiredHeadsetConnected = wiredMonitor.isWiredHeadsetConnected
+        self.connectedPortName = wiredMonitor.connectedPortName
+        self.portTypeDescription = wiredMonitor.portTypeDescription
+        self.wiredSampleRate = wiredMonitor.sampleRate
+        self.wiredChannelCount = wiredMonitor.channelCount
+        self.hardwareFormatText = wiredMonitor.hardwareFormatDescription
+        self.activeAudioRoute = wiredMonitor.isWiredHeadsetConnected ? wiredMonitor.connectedPortName : systemController.getActiveAudioRoute()
         self.isSystemEQActive = audiogramManager.isHeadphoneAccommodationsEnabled()
     }
     
-    // MARK: - System-Wide EQ Operations
-    public func applySystemWideEQ(restartDaemons: Bool = false) {
+    // MARK: - Wired Headphone System-Wide EQ Operations
+    
+    /// Applies 10-band curve as a 7-band Audiogram targeting Wired Headphones exclusively.
+    public func applyToWiredOutput(restartDaemons: Bool = true) {
         let gains = bands.map { $0.gain }
         
-        // 1. Inject Audiogram into iOS Headphone Accommodations via CFPreferences & disk
+        // 1. Inject Audiogram into iOS Headphone Accommodations targeting wired headphones
         let audiogramSuccess = audiogramManager.applyCustomAudiogramEQ(bandGains: gains, restartDaemons: restartDaemons)
         
         // 2. Sync with mediaserverd tweak / hook IPC
@@ -129,11 +193,16 @@ public final class EqualizerViewModel: ObservableObject {
         if audiogramSuccess || ipcSuccess {
             isSystemEQActive = true
             systemStatusMessage = restartDaemons
-                ? "System EQ synced and audio daemons restarted!"
-                : "System EQ curve synced to CFPreferences (tap Restart Audio to apply)."
+                ? "Wired EQ synced & audio daemons (mediaserverd & heard) restarted!"
+                : "Wired EQ curve synced to CFPreferences (tap Restart Audio to apply)."
         } else {
             systemStatusMessage = "Could not write system preferences. Ensure TrollStore or Jailbreak is active."
         }
+    }
+    
+    /// Alias for backwards compatibility
+    public func applySystemWideEQ(restartDaemons: Bool = false) {
+        applyToWiredOutput(restartDaemons: restartDaemons)
     }
     
     public func disableSystemWideEQ() {
@@ -145,20 +214,26 @@ public final class EqualizerViewModel: ObservableObject {
             limiterEnabled: false
         )
         isSystemEQActive = false
-        systemStatusMessage = "System-wide EQ bypassed."
+        systemStatusMessage = "Wired Headphone EQ bypassed."
     }
     
-    public func resetSystemAudioToDefault() {
-        audiogramManager.resetToDefaultSystemAudio()
+    /// Resets Wired Headphone EQ and audiograms back to default un-equalized iOS state.
+    public func resetWiredEQToStock() {
+        audiogramManager.resetWiredEQToStock()
         isSystemEQActive = false
         resetToFlat()
-        systemStatusMessage = "System audio and audiograms successfully reset to stock iOS default."
+        systemStatusMessage = "Wired headphone audio & audiograms successfully reset to stock iOS default."
+    }
+    
+    /// Alias for backwards compatibility
+    public func resetSystemAudioToDefault() {
+        resetWiredEQToStock()
     }
     
     public func disableHeadphoneSafetyLimit() {
         let success = systemController.disableHeadphoneVolumeLimit()
         isHeadphoneLimitDisabled = success
-        systemStatusMessage = success ? "EU 85dB volume cap removed." : "Unable to override limit."
+        systemStatusMessage = success ? "EU 85dB wired headphone cap removed." : "Unable to override limit."
     }
     
     public func restartAudioEngine() {
@@ -181,7 +256,6 @@ public final class EqualizerViewModel: ObservableObject {
             isMicMonitoring = false
         } else {
             do {
-                // If media player was running, pause it first
                 if isPlaying { pause() }
                 try micEngine.startMonitoring()
                 isMicMonitoring = true
@@ -246,7 +320,7 @@ public final class EqualizerViewModel: ObservableObject {
         
         // Auto-sync if system-wide EQ is currently active
         if isSystemEQActive && audioMode == .systemWide {
-            applySystemWideEQ()
+            applyToWiredOutput(restartDaemons: false)
         }
         
         if activePreset.isSystem {
@@ -273,7 +347,7 @@ public final class EqualizerViewModel: ObservableObject {
             if isEQBypassed {
                 disableSystemWideEQ()
             } else {
-                applySystemWideEQ()
+                applyToWiredOutput(restartDaemons: true)
             }
         }
     }
@@ -285,7 +359,7 @@ public final class EqualizerViewModel: ObservableObject {
         audioEngine.updateEffects(effects)
         
         if isSystemEQActive {
-            applySystemWideEQ()
+            applyToWiredOutput(restartDaemons: false)
         }
     }
     
@@ -306,7 +380,7 @@ public final class EqualizerViewModel: ObservableObject {
         audioEngine.setAllBandGains(preset.gains)
         
         if isSystemEQActive {
-            applySystemWideEQ()
+            applyToWiredOutput(restartDaemons: false)
         }
     }
     

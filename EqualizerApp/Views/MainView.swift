@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Main container screen supporting iOS 14.0 - 15.x with System-Wide Audio,
+/// Main container screen supporting iOS 14.0 - 15.x with Wired System Audio,
 /// Microphone DSP Monitoring, and Studio Media Player modes.
 public struct MainView: View {
     @StateObject private var viewModel = EqualizerViewModel()
@@ -24,7 +24,10 @@ public struct MainView: View {
                 // Top Header Bar
                 headerBar
                 
-                // Mode Selector Bar (System EQ / Mic DSP / Studio Player)
+                // Wired Headphone Status Banner
+                wiredHeadphoneStatusBanner
+                
+                // Mode Selector Bar (Wired System EQ / Mic DSP / Studio Player)
                 modeSelectorBar
                 
                 // Real-Time Spectrum Visualizer
@@ -95,14 +98,14 @@ public struct MainView: View {
             
             Spacer()
             
-            // Active Audio Route Pill
+            // Active Wired Audio Route Pill
             Button(action: {
                 viewModel.isSystemSettingsPresented = true
             }) {
                 HStack(spacing: 4) {
-                    Image(systemName: "airpodspro")
+                    Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
                         .font(.system(size: 11))
-                    Text(viewModel.activeAudioRoute)
+                    Text(viewModel.connectedPortName)
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(1)
                 }
@@ -110,7 +113,7 @@ public struct MainView: View {
                 .padding(.vertical, 5)
                 .background(Color.white.opacity(0.08))
                 .cornerRadius(8)
-                .foregroundColor(.cyan)
+                .foregroundColor(viewModel.isWiredHeadsetConnected ? .cyan : .orange)
             }
             
             // Preset Selector Button
@@ -148,6 +151,69 @@ public struct MainView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 2)
+    }
+    
+    // MARK: - Wired Headphone Status Banner
+    private var wiredHeadphoneStatusBanner: some View {
+        HStack(spacing: 10) {
+            // Pulse indicator dot
+            ZStack {
+                Circle()
+                    .fill(viewModel.isWiredHeadsetConnected ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: viewModel.isWiredHeadsetConnected ? Color.green : Color.orange.opacity(0.8), radius: 3)
+                
+                if viewModel.isWiredHeadsetConnected {
+                    Circle()
+                        .stroke(Color.green.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: 16, height: 16)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(viewModel.isWiredHeadsetConnected ? "WIRED HEADPHONES CONNECTED" : "NO WIRED HEADPHONES DETECTED")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(viewModel.isWiredHeadsetConnected ? .green : .orange)
+                    
+                    if viewModel.isWiredHeadsetConnected {
+                        Text(viewModel.portTypeDescription)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.cyan)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.cyan.opacity(0.15)))
+                    }
+                }
+                
+                Text(viewModel.isWiredHeadsetConnected
+                     ? "\(viewModel.connectedPortName) • \(viewModel.hardwareFormatText)"
+                     : "Connect 3.5mm Aux, Lightning, or USB-C Audio / DAC")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(viewModel.isWiredHeadsetConnected ? .cyan : .secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(white: 0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(
+                            viewModel.isWiredHeadsetConnected ? Color.green.opacity(0.25) : Color.orange.opacity(0.25),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .padding(.horizontal, 12)
     }
     
     // MARK: - Operating Mode Switcher Bar
@@ -205,27 +271,27 @@ public struct MainView: View {
                     Circle()
                         .fill(viewModel.isSystemEQActive ? Color.green : Color.orange)
                         .frame(width: 8, height: 8)
-                    Text(viewModel.isSystemEQActive ? "SYSTEM EQ ACTIVE" : "SYSTEM EQ BYPASSED")
+                    Text(viewModel.isSystemEQActive ? "WIRED EQ ACTIVE" : "WIRED EQ BYPASSED")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(viewModel.isSystemEQActive ? .green : .orange)
                 }
-                Text("All apps (Spotify, Music, Calls)")
+                Text("Exclusively for 3.5mm, Lightning & USB-C audio")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            // Push & Restart Audio Daemon Button
+            // Apply to Wired Output & Restart Audio Daemon Button
             Button(action: {
                 withAnimation {
-                    viewModel.applySystemWideEQ(restartDaemons: true)
+                    viewModel.applyToWiredOutput(restartDaemons: true)
                 }
             }) {
                 HStack(spacing: 5) {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 11))
-                    Text("Apply & Restart")
+                    Text("Apply to Wired")
                         .font(.system(size: 11, weight: .bold))
                 }
                 .padding(.horizontal, 12)

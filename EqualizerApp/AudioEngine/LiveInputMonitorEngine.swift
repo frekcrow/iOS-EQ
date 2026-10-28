@@ -22,11 +22,36 @@ public final class LiveInputMonitorEngine: NSObject {
         super.init()
         configureMicNodes()
         attachNodes()
+        setupRouteObserver()
     }
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         stopMonitoring()
     }
+    
+    private func setupRouteObserver() {
+        #if os(iOS)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+        #endif
+    }
+    
+    #if os(iOS)
+    @objc private func handleRouteChange(notification: Notification) {
+        WiredHeadphoneMonitor.shared.refresh()
+        // If wired headphones are unplugged during live mic monitoring, immediately stop to prevent feedback
+        if !WiredHeadphoneMonitor.shared.isWiredHeadsetConnected && isRunning {
+            DispatchQueue.main.async { [weak self] in
+                self?.stopMonitoring()
+            }
+        }
+    }
+    #endif
     
     private func configureMicNodes() {
         let freqs = EQBand.standardFrequencies
@@ -54,10 +79,11 @@ public final class LiveInputMonitorEngine: NSObject {
         
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
+        // Strictly wired headset/mic monitoring: No Bluetooth, No defaultToSpeaker (prevents feedback loops)
         try session.setCategory(
             .playAndRecord,
             mode: .default,
-            options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+            options: [.mixWithOthers]
         )
         try session.setPreferredIOBufferDuration(0.005)
         try session.setActive(true)

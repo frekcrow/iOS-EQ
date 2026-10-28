@@ -35,6 +35,7 @@
 		EA01001A /* LiveInputMonitorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001E /* LiveInputMonitorEngine.swift */; };
 		EA01001B /* SystemAudioSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001F /* SystemAudioSheetView.swift */; };
 		EA01001C /* MicControlBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020020 /* MicControlBarView.swift */; };
+		EA01001D /* WiredHeadphoneMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020021 /* WiredHeadphoneMonitor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +81,7 @@
 		EA02001E /* LiveInputMonitorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInputMonitorEngine.swift; sourceTree = "<group>"; };
 		EA02001F /* SystemAudioSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioSheetView.swift; sourceTree = "<group>"; };
 		EA020020 /* MicControlBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicControlBarView.swift; sourceTree = "<group>"; };
+		EA020021 /* WiredHeadphoneMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiredHeadphoneMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +164,7 @@
 				EA020009 /* AudioToneGenerator.swift */,
 				EA02000A /* AudioEngineManager.swift */,
 				EA02001E /* LiveInputMonitorEngine.swift */,
+				EA020021 /* WiredHeadphoneMonitor.swift */,
 			);
 			path = AudioEngine;
 			sourceTree = "<group>";
@@ -359,6 +362,7 @@
 				EA01001A /* LiveInputMonitorEngine.swift in Sources */,
 				EA01001B /* SystemAudioSheetView.swift in Sources */,
 				EA01001C /* MicControlBarView.swift in Sources */,
+				EA01001D /* WiredHeadphoneMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
