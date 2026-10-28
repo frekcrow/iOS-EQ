@@ -2,21 +2,28 @@ import SwiftUI
 
 /// Main container screen supporting iOS 14.0 - 15.x with Wired System Audio,
 /// Microphone DSP Monitoring, and Studio Media Player modes.
+/// Designed according to Apple HIG, tactile hardware depth, and fluid physics.
 public struct MainView: View {
     @StateObject private var viewModel = EqualizerViewModel()
+    @Namespace private var modeAnimation
+    @State private var isPulsing: Bool = false
     
     public init() {}
     
     public var body: some View {
         ZStack {
-            // Dark hardware studio background gradient
-            LinearGradient(
+            // Studio hardware machined background with subtle radial ambiance
+            EqualizerTheme.Colors.backgroundBase
+                .ignoresSafeArea()
+            
+            RadialGradient(
                 colors: [
-                    Color(red: 0.05, green: 0.06, blue: 0.08),
-                    Color(red: 0.08, green: 0.09, blue: 0.12)
+                    EqualizerTheme.Colors.cyanAccent.opacity(0.04),
+                    Color.clear
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                center: .top,
+                startRadius: 20,
+                endRadius: 380
             )
             .ignoresSafeArea()
             
@@ -27,7 +34,7 @@ public struct MainView: View {
                 // Wired Headphone Status Banner
                 wiredHeadphoneStatusBanner
                 
-                // Mode Selector Bar (Wired System EQ / Mic DSP / Studio Player)
+                // Physical Segmented Mode Selector Bar
                 modeSelectorBar
                 
                 // Real-Time Spectrum Visualizer
@@ -78,21 +85,37 @@ public struct MainView: View {
     
     // MARK: - Header Bar
     private var headerBar: some View {
-        HStack {
+        HStack(spacing: 8) {
             // Branding & Environment Pill
-            HStack(spacing: 6) {
-                Image(systemName: "slider.vertical.3")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.cyan)
+            HStack(spacing: 7) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(EqualizerTheme.Colors.cyanAccent.opacity(0.12))
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(EqualizerTheme.Colors.cyanAccent.opacity(0.35), lineWidth: 1)
+                        )
+                    
+                    Image(systemName: "slider.vertical.3")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(EqualizerTheme.Colors.cyanAccent)
+                }
                 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("EQ PRO")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundColor(.white)
+                        .tracking(0.5)
                     
-                    Text(viewModel.isUnsandboxed ? "TROLLSTORE" : "JAILBREAK")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(viewModel.isUnsandboxed ? .green : .orange)
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(viewModel.isUnsandboxed ? EqualizerTheme.Colors.emerald : EqualizerTheme.Colors.tubeAmber)
+                            .frame(width: 5, height: 5)
+                        Text(viewModel.isUnsandboxed ? "TROLLSTORE" : "JAILBREAK")
+                            .font(.system(size: 7.5, weight: .heavy, design: .monospaced))
+                            .foregroundColor(viewModel.isUnsandboxed ? EqualizerTheme.Colors.emerald : EqualizerTheme.Colors.tubeAmber)
+                    }
                 }
             }
             
@@ -100,153 +123,207 @@ public struct MainView: View {
             
             // Active Wired Audio Route Pill
             Button(action: {
+                EqualizerTheme.Haptics.impactLight()
                 viewModel.isSystemSettingsPresented = true
             }) {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: .semibold))
                     Text(viewModel.connectedPortName)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.08))
-                .cornerRadius(8)
-                .foregroundColor(viewModel.isWiredHeadsetConnected ? .cyan : .orange)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(EqualizerTheme.Colors.surfaceTray)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.emerald.opacity(0.3) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
+                        )
+                )
+                .foregroundColor(viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.emerald : .secondary)
             }
+            .pressable()
             
             // Preset Selector Button
             Button(action: {
+                EqualizerTheme.Haptics.impactLight()
                 viewModel.isPresetsSheetPresented = true
             }) {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: viewModel.activePreset.iconName)
-                        .font(.system(size: 11))
-                    Text(viewModel.activePreset.name)
                         .font(.system(size: 11, weight: .semibold))
+                    Text(viewModel.activePreset.name)
+                        .font(.system(size: 11, weight: .bold))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 8, weight: .heavy))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(EqualizerTheme.Colors.surfaceTray)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(EqualizerTheme.Colors.borderHairline, lineWidth: 1)
+                        )
                 )
                 .foregroundColor(.white)
             }
+            .pressable()
             
             // System Settings Button
             Button(action: {
+                EqualizerTheme.Haptics.impactLight()
                 viewModel.isSystemSettingsPresented = true
             }) {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(viewModel.isSystemEQActive ? .green : .white)
-                    .padding(7)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Circle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(viewModel.isSystemEQActive ? EqualizerTheme.Colors.violet : .white)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle()
+                            .fill(EqualizerTheme.Colors.surfaceTray)
+                            .overlay(
+                                Circle()
+                                    .stroke(viewModel.isSystemEQActive ? EqualizerTheme.Colors.violet.opacity(0.4) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
+                            )
+                    )
             }
+            .pressable()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 2)
     }
     
     // MARK: - Wired Headphone Status Banner
     private var wiredHeadphoneStatusBanner: some View {
-        HStack(spacing: 10) {
-            // Pulse indicator dot
-            ZStack {
-                Circle()
-                    .fill(viewModel.isWiredHeadsetConnected ? Color.green : Color.orange)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: viewModel.isWiredHeadsetConnected ? Color.green : Color.orange.opacity(0.8), radius: 3)
-                
-                if viewModel.isWiredHeadsetConnected {
+        Button(action: {
+            EqualizerTheme.Haptics.impactLight()
+            viewModel.isSystemSettingsPresented = true
+        }) {
+            HStack(spacing: 10) {
+                // Breathing status indicator dot
+                ZStack {
                     Circle()
-                        .stroke(Color.green.opacity(0.35), lineWidth: 1.5)
-                        .frame(width: 16, height: 16)
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(viewModel.isWiredHeadsetConnected ? "WIRED HEADPHONES CONNECTED" : "NO WIRED HEADPHONES DETECTED")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(viewModel.isWiredHeadsetConnected ? .green : .orange)
+                        .fill(viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.emerald : EqualizerTheme.Colors.tubeAmber)
+                        .frame(width: 8, height: 8)
+                        .shadow(
+                            color: (viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.emerald : EqualizerTheme.Colors.tubeAmber).opacity(0.8),
+                            radius: 3
+                        )
                     
                     if viewModel.isWiredHeadsetConnected {
-                        Text(viewModel.portTypeDescription)
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.cyan)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(Color.cyan.opacity(0.15)))
+                        Circle()
+                            .stroke(EqualizerTheme.Colors.emerald.opacity(isPulsing ? 0.6 : 0.15), lineWidth: 1.5)
+                            .frame(width: isPulsing ? 18 : 12, height: isPulsing ? 18 : 12)
+                            .animation(Animation.easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: isPulsing)
                     }
                 }
+                .frame(width: 18, height: 18)
                 
-                Text(viewModel.isWiredHeadsetConnected
-                     ? "\(viewModel.connectedPortName) • \(viewModel.hardwareFormatText)"
-                     : "Connect 3.5mm Aux, Lightning, or USB-C Audio / DAC")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(viewModel.isWiredHeadsetConnected ? "WIRED OUTPUT ACTIVE" : "NO WIRED HEADPHONES DETECTED")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.emerald : EqualizerTheme.Colors.tubeAmber)
+                        
+                        if viewModel.isWiredHeadsetConnected {
+                            Text(viewModel.portTypeDescription)
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(EqualizerTheme.Colors.cyanAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1.5)
+                                .background(Capsule().fill(EqualizerTheme.Colors.cyanAccent.opacity(0.15)))
+                        }
+                    }
+                    
+                    Text(viewModel.isWiredHeadsetConnected
+                         ? "\(viewModel.connectedPortName) • \(viewModel.hardwareFormatText)"
+                         : "Connect 3.5mm Aux, Lightning, or USB-C Audio / DAC")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(viewModel.isWiredHeadsetConnected ? EqualizerTheme.Colors.cyanAccent : .secondary)
             }
-            
-            Spacer()
-            
-            Image(systemName: viewModel.isWiredHeadsetConnected ? "headphones" : "cable.connector.horizontal")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(viewModel.isWiredHeadsetConnected ? .cyan : .secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .studioCard(cornerRadius: 12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        viewModel.isWiredHeadsetConnected
+                            ? EqualizerTheme.Colors.emerald.opacity(0.25)
+                            : EqualizerTheme.Colors.tubeAmber.opacity(0.2),
+                        lineWidth: 1
+                    )
+            )
         }
+        .pressable()
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(white: 0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(
-                            viewModel.isWiredHeadsetConnected ? Color.green.opacity(0.25) : Color.orange.opacity(0.25),
-                            lineWidth: 1
-                        )
-                )
-        )
-        .padding(.horizontal, 12)
+        .onAppear {
+            isPulsing = true
+        }
     }
     
     // MARK: - Operating Mode Switcher Bar
     private var modeSelectorBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(AppAudioMode.allCases) { mode in
                 let isSelected = viewModel.audioMode == mode
                 
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    EqualizerTheme.Haptics.selection()
+                    withAnimation(EqualizerTheme.AnimationSprings.tactile) {
                         viewModel.audioMode = mode
                     }
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
                         Image(systemName: mode.iconName)
                             .font(.system(size: 11, weight: .bold))
                         Text(mode.rawValue)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 11, weight: .bold))
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                    .frame(height: 32)
+                    .foregroundColor(isSelected ? .white : .secondary)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(isSelected ? Color.cyan.opacity(0.2) : Color.white.opacity(0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(isSelected ? Color.cyan : Color.clear, lineWidth: 1)
-                            )
+                        ZStack {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 9)
+                                    .fill(EqualizerTheme.Colors.surfaceHighlight)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 9)
+                                            .stroke(EqualizerTheme.Colors.cyanAccent.opacity(0.4), lineWidth: 1)
+                                    )
+                                    .matchedGeometryEffect(id: "activeModeIndicator", in: modeAnimation)
+                                    .shadow(color: EqualizerTheme.Colors.cyanAccent.opacity(0.2), radius: 6, x: 0, y: 1)
+                            }
+                        }
                     )
-                    .foregroundColor(isSelected ? .cyan : .secondary)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(PlainButtonStyle())
             }
         }
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(EqualizerTheme.Colors.surfaceTray)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(EqualizerTheme.Colors.borderHairline, lineWidth: 1)
+                )
+        )
         .padding(.horizontal, 12)
     }
     
@@ -266,65 +343,79 @@ public struct MainView: View {
     // System-Wide Quick Push Bar
     private var systemWideBar: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+            // Status LED and Description
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
                     Circle()
-                        .fill(viewModel.isSystemEQActive ? Color.green : Color.orange)
+                        .fill(viewModel.isSystemEQActive ? EqualizerTheme.Colors.violet : EqualizerTheme.Colors.tubeAmber)
                         .frame(width: 8, height: 8)
+                        .shadow(
+                            color: (viewModel.isSystemEQActive ? EqualizerTheme.Colors.violet : EqualizerTheme.Colors.tubeAmber).opacity(0.7),
+                            radius: 3
+                        )
+                    
                     Text(viewModel.isSystemEQActive ? "WIRED EQ ACTIVE" : "WIRED EQ BYPASSED")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(viewModel.isSystemEQActive ? .green : .orange)
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(viewModel.isSystemEQActive ? EqualizerTheme.Colors.violet : EqualizerTheme.Colors.tubeAmber)
                 }
-                Text("Exclusively for 3.5mm, Lightning & USB-C audio")
-                    .font(.system(size: 9))
+                
+                Text("Audiogram daemon injection (heard) • Zero speaker leak")
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
             
             Spacer()
             
             // Apply to Wired Output & Restart Audio Daemon Button
             Button(action: {
-                withAnimation {
+                EqualizerTheme.Haptics.impactMedium()
+                withAnimation(EqualizerTheme.AnimationSprings.fluidDefault) {
                     viewModel.applyToWiredOutput(restartDaemons: true)
                 }
             }) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 11))
-                    Text("Apply to Wired")
                         .font(.system(size: 11, weight: .bold))
+                    Text("Apply to Wired")
+                        .font(.system(size: 11, weight: .heavy))
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(
-                    Capsule().fill(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))
+                    Capsule()
+                        .fill(EqualizerTheme.Colors.purpleBlueGradient)
+                        .overlay(
+                            Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
                 )
                 .foregroundColor(.white)
-                .shadow(color: Color.purple.opacity(0.4), radius: 4)
+                .shadow(color: EqualizerTheme.Colors.violet.opacity(0.4), radius: 6, x: 0, y: 2)
             }
+            .pressable()
             
             // Effects Rack Button
             Button(action: {
+                EqualizerTheme.Haptics.impactLight()
                 viewModel.isEffectsSheetPresented = true
             }) {
                 Image(systemName: "dial.low.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.cyan)
-                    .padding(8)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Circle())
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(EqualizerTheme.Colors.cyanAccent)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle()
+                            .fill(EqualizerTheme.Colors.surfaceHighlight)
+                            .overlay(
+                                Circle().stroke(EqualizerTheme.Colors.borderHairline, lineWidth: 1)
+                            )
+                    )
             }
+            .pressable()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color(red: 0.08, green: 0.09, blue: 0.12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
+        .studioCard(cornerRadius: 16)
         .padding(.horizontal, 12)
     }
 }

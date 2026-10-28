@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// A high-performance, studio-grade real-time frequency spectrum visualizer.
+/// Studio-grade real-time frequency spectrum visualizer with hardware peak hold caps,
+/// optical frequency grid lines, and smooth dynamic spring ballistics.
 public struct SpectrumVisualizerView: View {
     let magnitudes: [Float]
     let isPlaying: Bool
     
-    // State to store falling peak caps for classic hardware meter look
-    @State private var peakMagnitudes: [Float] = []
+    // Falling peak caps for physical analog hardware meter experience
+    @State private var peakMagnitudes: [Float] = Array(repeating: 0.0, count: 20)
+    @State private var peakHoldTimers: [Double] = Array(repeating: 0.0, count: 20)
     
     public init(magnitudes: [Float], isPlaying: Bool) {
         self.magnitudes = magnitudes
@@ -14,114 +16,169 @@ public struct SpectrumVisualizerView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 4) {
-            // Spectrum Canvas & Bars
+        VStack(spacing: 6) {
+            // Spectrum Display Enclosure
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let height = geometry.size.height
                 let barCount = max(1, magnitudes.count)
-                let spacing: CGFloat = 3.0
+                let spacing: CGFloat = 3.5
                 let totalSpacing = spacing * CGFloat(barCount - 1)
-                let barWidth = max(2.0, (width - totalSpacing) / CGFloat(barCount))
+                let barWidth = max(2.5, (width - totalSpacing) / CGFloat(barCount))
                 
                 ZStack(alignment: .bottomLeading) {
-                    // Background Studio Grid Lines
+                    // Studio dB Reference Lines
                     GridLinesView(height: height)
                     
-                    // Live Spectrum Bars
+                    // Live Spectrum Bars & Peak Caps
                     HStack(alignment: .bottom, spacing: spacing) {
                         ForEach(0..<barCount, id: \.self) { index in
-                            let mag = CGFloat(index < magnitudes.count ? magnitudes[index] : 0.0)
-                            let barHeight = max(4.0, mag * height)
+                            let rawMag = index < magnitudes.count ? magnitudes[index] : 0.0
+                            let currentMag = CGFloat(isPlaying ? rawMag : 0.0)
+                            let barHeight = max(3.0, currentMag * (height - 8))
                             
-                            VStack(spacing: 2) {
+                            // Peak calculation
+                            let peakVal = CGFloat(index < peakMagnitudes.count ? peakMagnitudes[index] : 0.0)
+                            let peakY = max(4.0, isPlaying ? peakVal * (height - 8) : 3.0)
+                            
+                            VStack(spacing: 0) {
                                 Spacer()
                                 
-                                // Glowing spectrum bar
-                                RoundedRectangle(cornerRadius: 2.0)
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [
-                                                Color(red: 0.15, green: 0.85, blue: 1.0), // Electric Cyan
-                                                Color(red: 0.35, green: 0.45, blue: 1.0), // Royal Blue
-                                                Color(red: 0.75, green: 0.25, blue: 0.95), // Neon Purple
-                                                Color(red: 1.0, green: 0.25, blue: 0.45)  // Hot Pink (peaks)
-                                            ]),
-                                            startPoint: .bottom,
-                                            endPoint: .top
+                                ZStack(alignment: .bottom) {
+                                    // Main Glowing Spectrum Bar
+                                    RoundedRectangle(cornerRadius: 2.0)
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    EqualizerTheme.Colors.cyanAccent,
+                                                    EqualizerTheme.Colors.royalBlue,
+                                                    EqualizerTheme.Colors.violet,
+                                                    EqualizerTheme.Colors.tubeAmber,
+                                                    EqualizerTheme.Colors.peakPink
+                                                ]),
+                                                startPoint: .bottom,
+                                                endPoint: .top
+                                            )
                                         )
-                                    )
-                                    .frame(width: barWidth, height: barHeight)
-                                    .shadow(
-                                        color: isPlaying ? Color.cyan.opacity(0.4) : Color.clear,
-                                        radius: 3,
-                                        x: 0,
-                                        y: 0
-                                    )
-                                    .animation(.easeOut(duration: 0.08), value: mag)
+                                        .frame(width: barWidth, height: barHeight)
+                                        .shadow(
+                                            color: isPlaying ? EqualizerTheme.Colors.cyanAccent.opacity(0.35) : Color.clear,
+                                            radius: 3,
+                                            x: 0,
+                                            y: -1
+                                        )
+                                    
+                                    // Peak Hold Cap Tick (floating LED tick)
+                                    if isPlaying && peakY > 6 {
+                                        RoundedRectangle(cornerRadius: 1.0)
+                                            .fill(peakY > height * 0.8 ? EqualizerTheme.Colors.peakPink : EqualizerTheme.Colors.tubeAmber)
+                                            .frame(width: barWidth, height: 2.0)
+                                            .offset(y: -peakY)
+                                            .shadow(color: EqualizerTheme.Colors.tubeAmber.opacity(0.6), radius: 2)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-            .frame(height: 110)
+            .frame(height: 108)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(red: 0.07, green: 0.08, blue: 0.11))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    )
+                // Double-bezel machined screen with subtle top edge specular reflection
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(EqualizerTheme.Colors.backgroundBase)
+                    
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.14), Color.white.opacity(0.04)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1
+                        )
+                }
             )
+            .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
             
-            // Frequency Axis Labels underneath
+            // Optical Frequency Legend with Monospaced Tracking
             HStack {
-                Text("32 Hz")
+                Text("32")
                 Spacer()
-                Text("250 Hz")
+                Text("125")
                 Spacer()
-                Text("1 kHz")
+                Text("500")
                 Spacer()
-                Text("4 kHz")
+                Text("2k")
                 Spacer()
-                Text("16 kHz")
+                Text("8k")
+                Spacer()
+                Text("16k Hz")
             }
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
-            .foregroundColor(.secondary)
+            .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+            .foregroundColor(.secondary.opacity(0.8))
             .padding(.horizontal, 16)
+        }
+        .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { _ in
+            guard isPlaying else {
+                if !peakMagnitudes.isEmpty {
+                    peakMagnitudes = Array(repeating: 0.0, count: 20)
+                }
+                return
+            }
+            updatePeaks()
+        }
+    }
+    
+    private func updatePeaks() {
+        if peakMagnitudes.count != magnitudes.count {
+            peakMagnitudes = Array(repeating: 0.0, count: magnitudes.count)
+        }
+        for i in 0..<magnitudes.count {
+            let current = magnitudes[i]
+            let prevPeak = peakMagnitudes[i]
+            if current >= prevPeak {
+                peakMagnitudes[i] = current
+            } else {
+                // Decay peak downward smoothly
+                peakMagnitudes[i] = max(0.0, prevPeak * 0.94 - 0.01)
+            }
         }
     }
 }
 
-/// Subtle dB reference grid lines across the spectrum display.
+/// Precise studio dB reference grid lines with negative tracking.
 private struct GridLinesView: View {
     let height: CGFloat
     
     var body: some View {
         VStack(spacing: 0) {
-            Group {
-                lineWithDb(label: " 0 dB")
-                Spacer()
-                lineWithDb(label: "-6 dB")
-                Spacer()
-                lineWithDb(label: "-18 dB")
-                Spacer()
-                lineWithDb(label: "-36 dB")
-            }
+            lineWithDb(label: " 0 dB")
+            Spacer()
+            lineWithDb(label: "-6 dB")
+            Spacer()
+            lineWithDb(label: "-12 dB")
+            Spacer()
+            lineWithDb(label: "-24 dB")
+            Spacer()
+            lineWithDb(label: "-48 dB")
         }
+        .padding(.vertical, 2)
     }
     
     private func lineWithDb(label: String) -> some View {
-        HStack {
+        HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 8, weight: .regular, design: .monospaced))
-                .foregroundColor(.white.opacity(0.25))
+                .font(.system(size: 7.5, weight: .regular, design: .monospaced))
+                .foregroundColor(.white.opacity(0.20))
+                .frame(width: 32, alignment: .leading)
             
             Rectangle()
-                .fill(Color.white.opacity(0.06))
-                .frame(height: 0.8)
+                .fill(Color.white.opacity(0.05))
+                .frame(height: 0.75)
         }
     }
 }

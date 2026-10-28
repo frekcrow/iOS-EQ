@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Studio Effects Rack modal presenting Reverb, Delay, Pitch, Distortion, and Pan controls.
+/// Studio DSP Effects Rack modal presenting Reverb, Delay, Pitch, Distortion,
+/// Stereo Pan, and Master Volume controls in a double-bezel modular rack design.
 public struct EffectsRackView: View {
     @ObservedObject var viewModel: EqualizerViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -12,23 +13,23 @@ public struct EffectsRackView: View {
     public var body: some View {
         NavigationView {
             ZStack {
-                Color(red: 0.05, green: 0.06, blue: 0.08).ignoresSafeArea()
+                EqualizerTheme.Colors.backgroundBase.ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Reverb Unit
+                    VStack(spacing: 14) {
+                        // Reverb Module
                         reverbCard
                         
-                        // Delay / Echo Unit
+                        // Stereo Delay / Echo Module
                         delayCard
                         
-                        // Pitch Shifter & Speed
+                        // Pitch Shifter & Playback Speed
                         pitchCard
                         
-                        // Distortion / Saturation
+                        // Distortion / Tube Saturation
                         distortionCard
                         
-                        // Stereo Pan & Master Volume
+                        // Master Output & Stereo Panning
                         masterRoutingCard
                     }
                     .padding(.horizontal, 16)
@@ -42,7 +43,8 @@ public struct EffectsRackView: View {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(.cyan)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(EqualizerTheme.Colors.cyanAccent)
                 }
             }
         }
@@ -53,18 +55,23 @@ public struct EffectsRackView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "skew")
-                    .foregroundColor(.purple)
+                    .foregroundColor(EqualizerTheme.Colors.violet)
+                    .font(.system(size: 14, weight: .bold))
                 Text("REVERBERATION")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .tracking(0.5)
                 
                 Spacer()
                 
                 Toggle("", isOn: $viewModel.effects.isReverbEnabled)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .purple))
+                    .toggleStyle(SwitchToggleStyle(tint: EqualizerTheme.Colors.violet))
                     .onChange(of: viewModel.effects.isReverbEnabled) { _ in
-                        viewModel.updateEffects()
+                        withAnimation(EqualizerTheme.AnimationSprings.tactile) {
+                            viewModel.updateEffects()
+                        }
+                        EqualizerTheme.Haptics.impactLight()
                     }
             }
             
@@ -73,7 +80,7 @@ public struct EffectsRackView: View {
                     // Preset Picker
                     HStack {
                         Text("Room Preset")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12.5, weight: .medium))
                             .foregroundColor(.secondary)
                         Spacer()
                         Picker("Preset", selection: $viewModel.effects.reverbPreset) {
@@ -84,6 +91,7 @@ public struct EffectsRackView: View {
                         .pickerStyle(MenuPickerStyle())
                         .onChange(of: viewModel.effects.reverbPreset) { _ in
                             viewModel.updateEffects()
+                            EqualizerTheme.Haptics.selection()
                         }
                     }
                     
@@ -91,21 +99,19 @@ public struct EffectsRackView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Wet / Dry Mix")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.0f %%", viewModel.effects.reverbWetDryMix))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.purple)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.violet)
                         }
                         
-                        Slider(value: $viewModel.effects.reverbWetDryMix, in: 0...100, step: 1) {
-                            Text("Mix")
-                        }
-                        .accentColor(.purple)
-                        .onChange(of: viewModel.effects.reverbWetDryMix) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.reverbWetDryMix, in: 0...100, step: 1)
+                            .accentColor(EqualizerTheme.Colors.violet)
+                            .onChange(of: viewModel.effects.reverbWetDryMix) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                 }
                 .transition(.opacity)
@@ -114,10 +120,10 @@ public struct EffectsRackView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(white: 0.10))
+                .fill(EqualizerTheme.Colors.surfaceTray)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(viewModel.effects.isReverbEnabled ? Color.purple.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(viewModel.effects.isReverbEnabled ? EqualizerTheme.Colors.violet.opacity(0.4) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
                 )
         )
     }
@@ -127,18 +133,23 @@ public struct EffectsRackView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "repeat.1")
-                    .foregroundColor(.blue)
+                    .foregroundColor(EqualizerTheme.Colors.royalBlue)
+                    .font(.system(size: 14, weight: .bold))
                 Text("STEREO DELAY / ECHO")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .tracking(0.5)
                 
                 Spacer()
                 
                 Toggle("", isOn: $viewModel.effects.isDelayEnabled)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .toggleStyle(SwitchToggleStyle(tint: EqualizerTheme.Colors.royalBlue))
                     .onChange(of: viewModel.effects.isDelayEnabled) { _ in
-                        viewModel.updateEffects()
+                        withAnimation(EqualizerTheme.AnimationSprings.tactile) {
+                            viewModel.updateEffects()
+                        }
+                        EqualizerTheme.Haptics.impactLight()
                     }
             }
             
@@ -148,63 +159,57 @@ public struct EffectsRackView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Delay Time")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.2f s", viewModel.effects.delayTime))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.blue)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.royalBlue)
                         }
                         
-                        Slider(value: $viewModel.effects.delayTime, in: 0.05...1.0, step: 0.01) {
-                            Text("Time")
-                        }
-                        .accentColor(.blue)
-                        .onChange(of: viewModel.effects.delayTime) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.delayTime, in: 0.05...1.0, step: 0.01)
+                            .accentColor(EqualizerTheme.Colors.royalBlue)
+                            .onChange(of: viewModel.effects.delayTime) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                     
                     // Feedback
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Feedback")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.0f %%", viewModel.effects.delayFeedback))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.blue)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.royalBlue)
                         }
                         
-                        Slider(value: $viewModel.effects.delayFeedback, in: 0...90, step: 1) {
-                            Text("Feedback")
-                        }
-                        .accentColor(.blue)
-                        .onChange(of: viewModel.effects.delayFeedback) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.delayFeedback, in: 0...90, step: 1)
+                            .accentColor(EqualizerTheme.Colors.royalBlue)
+                            .onChange(of: viewModel.effects.delayFeedback) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                     
                     // Wet/Dry Mix
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Wet / Dry Mix")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.0f %%", viewModel.effects.delayWetDryMix))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.blue)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.royalBlue)
                         }
                         
-                        Slider(value: $viewModel.effects.delayWetDryMix, in: 0...100, step: 1) {
-                            Text("Mix")
-                        }
-                        .accentColor(.blue)
-                        .onChange(of: viewModel.effects.delayWetDryMix) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.delayWetDryMix, in: 0...100, step: 1)
+                            .accentColor(EqualizerTheme.Colors.royalBlue)
+                            .onChange(of: viewModel.effects.delayWetDryMix) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                 }
                 .transition(.opacity)
@@ -213,10 +218,10 @@ public struct EffectsRackView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(white: 0.10))
+                .fill(EqualizerTheme.Colors.surfaceTray)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(viewModel.effects.isDelayEnabled ? Color.blue.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(viewModel.effects.isDelayEnabled ? EqualizerTheme.Colors.royalBlue.opacity(0.4) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
                 )
         )
     }
@@ -226,18 +231,23 @@ public struct EffectsRackView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "tuningfork")
-                    .foregroundColor(.cyan)
-                Text("PITCH & PLAYBACK RATE")
-                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(EqualizerTheme.Colors.cyanAccent)
+                    .font(.system(size: 14, weight: .bold))
+                Text("PITCH & PLAYBACK SPEED")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .tracking(0.5)
                 
                 Spacer()
                 
                 Toggle("", isOn: $viewModel.effects.isPitchEnabled)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .cyan))
+                    .toggleStyle(SwitchToggleStyle(tint: EqualizerTheme.Colors.cyanAccent))
                     .onChange(of: viewModel.effects.isPitchEnabled) { _ in
-                        viewModel.updateEffects()
+                        withAnimation(EqualizerTheme.AnimationSprings.tactile) {
+                            viewModel.updateEffects()
+                        }
+                        EqualizerTheme.Haptics.impactLight()
                     }
             }
             
@@ -247,54 +257,51 @@ public struct EffectsRackView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Pitch Shift")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             let semitones = viewModel.effects.pitchCents / 100.0
                             Text(String(format: "%+.1f semitones", semitones))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.cyan)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.cyanAccent)
                         }
                         
-                        Slider(value: $viewModel.effects.pitchCents, in: -1200...1200, step: 100) {
-                            Text("Pitch")
-                        }
-                        .accentColor(.cyan)
-                        .onChange(of: viewModel.effects.pitchCents) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.pitchCents, in: -1200...1200, step: 100)
+                            .accentColor(EqualizerTheme.Colors.cyanAccent)
+                            .onChange(of: viewModel.effects.pitchCents) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                     
                     // Rate (Speed)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Playback Speed")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.2fx", viewModel.effects.playbackRate))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.cyan)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.cyanAccent)
                         }
                         
-                        Slider(value: $viewModel.effects.playbackRate, in: 0.5...2.0, step: 0.05) {
-                            Text("Speed")
-                        }
-                        .accentColor(.cyan)
-                        .onChange(of: viewModel.effects.playbackRate) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.playbackRate, in: 0.5...2.0, step: 0.05)
+                            .accentColor(EqualizerTheme.Colors.cyanAccent)
+                            .onChange(of: viewModel.effects.playbackRate) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                 }
+                .transition(.opacity)
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(white: 0.10))
+                .fill(EqualizerTheme.Colors.surfaceTray)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(viewModel.effects.isPitchEnabled ? Color.cyan.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(viewModel.effects.isPitchEnabled ? EqualizerTheme.Colors.cyanAccent.opacity(0.4) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
                 )
         )
     }
@@ -304,26 +311,31 @@ public struct EffectsRackView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "waveform.path.ecg")
-                    .foregroundColor(.orange)
-                Text("DISTORTION & OVERDRIVE")
-                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(EqualizerTheme.Colors.tubeAmber)
+                    .font(.system(size: 14, weight: .bold))
+                Text("DISTORTION & TUBE DRIVE")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .tracking(0.5)
                 
                 Spacer()
                 
                 Toggle("", isOn: $viewModel.effects.isDistortionEnabled)
                     .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .orange))
+                    .toggleStyle(SwitchToggleStyle(tint: EqualizerTheme.Colors.tubeAmber))
                     .onChange(of: viewModel.effects.isDistortionEnabled) { _ in
-                        viewModel.updateEffects()
+                        withAnimation(EqualizerTheme.AnimationSprings.tactile) {
+                            viewModel.updateEffects()
+                        }
+                        EqualizerTheme.Haptics.impactLight()
                     }
             }
             
             if viewModel.effects.isDistortionEnabled {
                 VStack(spacing: 12) {
                     HStack {
-                        Text("Flavor")
-                            .font(.system(size: 13))
+                        Text("Drive Flavor")
+                            .font(.system(size: 12.5, weight: .medium))
                             .foregroundColor(.secondary)
                         Spacer()
                         Picker("Distortion Type", selection: $viewModel.effects.distortionPreset) {
@@ -334,38 +346,38 @@ public struct EffectsRackView: View {
                         .pickerStyle(MenuPickerStyle())
                         .onChange(of: viewModel.effects.distortionPreset) { _ in
                             viewModel.updateEffects()
+                            EqualizerTheme.Haptics.selection()
                         }
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Amount")
-                                .font(.system(size: 12))
+                            Text("Drive Amount")
+                                .font(.system(size: 11.5))
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(String(format: "%.0f %%", viewModel.effects.distortionWetDryMix))
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(.orange)
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(EqualizerTheme.Colors.tubeAmber)
                         }
                         
-                        Slider(value: $viewModel.effects.distortionWetDryMix, in: 0...100, step: 1) {
-                            Text("Mix")
-                        }
-                        .accentColor(.orange)
-                        .onChange(of: viewModel.effects.distortionWetDryMix) { _ in
-                            viewModel.updateEffects()
-                        }
+                        Slider(value: $viewModel.effects.distortionWetDryMix, in: 0...100, step: 1)
+                            .accentColor(EqualizerTheme.Colors.tubeAmber)
+                            .onChange(of: viewModel.effects.distortionWetDryMix) { _ in
+                                viewModel.updateEffects()
+                            }
                     }
                 }
+                .transition(.opacity)
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(white: 0.10))
+                .fill(EqualizerTheme.Colors.surfaceTray)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(viewModel.effects.isDistortionEnabled ? Color.orange.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(viewModel.effects.isDistortionEnabled ? EqualizerTheme.Colors.tubeAmber.opacity(0.4) : EqualizerTheme.Colors.borderHairline, lineWidth: 1)
                 )
         )
     }
@@ -375,10 +387,12 @@ public struct EffectsRackView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "headphones")
-                    .foregroundColor(.green)
-                Text("PANNING & MASTER VOLUME")
-                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(EqualizerTheme.Colors.emerald)
+                    .font(.system(size: 14, weight: .bold))
+                Text("PANNING & MASTER OUTPUT")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .tracking(0.5)
             }
             
             // Stereo Pan
@@ -389,7 +403,7 @@ public struct EffectsRackView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("Stereo Balance")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundColor(.secondary)
                     Spacer()
                     Text("R")
@@ -397,43 +411,39 @@ public struct EffectsRackView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Slider(value: $viewModel.effects.panBalance, in: -1.0...1.0, step: 0.05) {
-                    Text("Pan")
-                }
-                .accentColor(.green)
-                .onChange(of: viewModel.effects.panBalance) { _ in
-                    viewModel.updateEffects()
-                }
+                Slider(value: $viewModel.effects.panBalance, in: -1.0...1.0, step: 0.05)
+                    .accentColor(EqualizerTheme.Colors.emerald)
+                    .onChange(of: viewModel.effects.panBalance) { _ in
+                        viewModel.updateEffects()
+                    }
             }
             
             // Master Volume
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Master Output")
-                        .font(.system(size: 12))
+                    Text("Master Volume")
+                        .font(.system(size: 11.5))
                         .foregroundColor(.secondary)
                     Spacer()
                     Text(String(format: "%.0f %%", viewModel.effects.masterVolume * 100))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(.green)
+                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(EqualizerTheme.Colors.emerald)
                 }
                 
-                Slider(value: $viewModel.effects.masterVolume, in: 0.0...1.0, step: 0.01) {
-                    Text("Volume")
-                }
-                .accentColor(.green)
-                .onChange(of: viewModel.effects.masterVolume) { _ in
-                    viewModel.updateEffects()
-                }
+                Slider(value: $viewModel.effects.masterVolume, in: 0.0...1.0, step: 0.01)
+                    .accentColor(EqualizerTheme.Colors.emerald)
+                    .onChange(of: viewModel.effects.masterVolume) { _ in
+                        viewModel.updateEffects()
+                    }
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(white: 0.10))
+                .fill(EqualizerTheme.Colors.surfaceTray)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(EqualizerTheme.Colors.borderHairline, lineWidth: 1)
                 )
         )
     }

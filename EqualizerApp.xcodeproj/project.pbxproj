@@ -36,6 +36,7 @@
 		EA01001B /* SystemAudioSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA02001F /* SystemAudioSheetView.swift */; };
 		EA01001C /* MicControlBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020020 /* MicControlBarView.swift */; };
 		EA01001D /* WiredHeadphoneMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020021 /* WiredHeadphoneMonitor.swift */; };
+		EA01001E /* EqualizerTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA020022 /* EqualizerTheme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		EA02001F /* SystemAudioSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioSheetView.swift; sourceTree = "<group>"; };
 		EA020020 /* MicControlBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicControlBarView.swift; sourceTree = "<group>"; };
 		EA020021 /* WiredHeadphoneMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiredHeadphoneMonitor.swift; sourceTree = "<group>"; };
+		EA020022 /* EqualizerTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EqualizerTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,6 +195,7 @@
 			children = (
 				EA02000D /* MainView.swift */,
 				EA020014 /* DocumentPicker.swift */,
+				EA020022 /* EqualizerTheme.swift */,
 				EA030009 /* Components */,
 			);
 			path = Views;
@@ -363,6 +366,7 @@
 				EA01001B /* SystemAudioSheetView.swift in Sources */,
 				EA01001C /* MicControlBarView.swift in Sources */,
 				EA01001D /* WiredHeadphoneMonitor.swift in Sources */,
+				EA01001E /* EqualizerTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
